@@ -292,4 +292,52 @@ git push -u origin main
 | **Missing Processed Parquet on Cloud** | High | Resolved: `data/processed/` is unignored in `.gitignore` so required Parquet files are committed to Git. |
 | **Missing `GROQ_API_KEY`** | None | Graceful fallback: Built-in deterministic forensic engine activates automatically without error. |
 | **Memory Consumption on Cloud** | Low | The app loads Parquet files selectively using columnar filters (`filters=[("txId", "==", id)]`), keeping RAM consumption within Streamlit Cloud's 1 GB free tier limits. |
+| **Plotly Axis Deprecation (`titlefont`)** | **RESOLVED** | Fixed in `src/ui/theme.py`: Replaced deprecated `titlefont` with modern `title=dict(font=dict(...))`. Verified across all 7 dashboard views. |
+
+---
+
+## 12. Post-Deployment Production Hotfix: Plotly `titlefont` Resolution
+
+### 12.1 Defect Description
+Upon deployment to Streamlit Community Cloud, launching the Executive Dashboard raised:
+```text
+ValueError: Invalid property specified for object of type plotly.graph_objs.layout.XAxis: 'titlefont'
+Traceback:
+  File "src/ui/dashboard.py", line 191, in render_dashboard_page
+    apply_cyber_theme(fig_temp, height=360, show_legend=True)
+  File "src/ui/theme.py", line 117, in apply_cyber_theme
+    fig.update_layout(**get_cyber_layout_dict(title=title, height=height, show_legend=show_legend))
+```
+
+### 12.2 Root Cause Analysis
+Streamlit Community Cloud builds packages from `requirements.txt` using the latest compatible versions (`plotly >= 5.18.0`). In modern Plotly releases (v5.20+ and v6+), legacy axis property aliases such as `xaxis.titlefont` and `yaxis.titlefont` were deprecated and subsequently removed in favor of nested dictionary configurations: `xaxis.title.font`. When `apply_cyber_theme` passed `titlefont=dict(...)` to `fig.update_layout()`, Plotly's strict property validator threw a `ValueError`.
+
+### 12.3 Applied Solution
+1. **`src/ui/theme.py`:**
+   Updated `get_cyber_layout_dict()` to replace deprecated flat attributes with Plotly's standard nested hierarchy:
+   ```python
+   # BEFORE (Deprecated)
+   xaxis=dict(
+       ...
+       titlefont=dict(color=TEXT_PRIMARY, size=11),
+   )
+
+   # AFTER (Plotly 5.x / 6.x Compatible)
+   xaxis=dict(
+       ...
+       title=dict(font=dict(color=TEXT_PRIMARY, size=11)),
+   )
+   ```
+   Both `xaxis` and `yaxis` were updated. All visual cyberpunk aesthetics, text colors, and font sizes were 100% preserved.
+2. **Chart Compatibility Verification:**
+   All 4 primary chart categories used across the 7 application modules were audited:
+   - **Line Charts (Temporal Surveillance):** Dual-axis volume/illicit surge charts with area glow.
+   - **Bar Charts (Model & Search):** Horizontal Gini importance and z-score anomaly distributions.
+   - **Donut / Pie Charts (Executive Overview):** 3-class ground-truth composition with custom hole and legend.
+   - **Network Scatter (Topological Anatomy):** 2D ego subgraphs with node/edge traces.
+   - **Heatmaps (Model Intelligence):** 2x2 confusion matrix with custom cyber colorscales.
+3. **Automated Regression Suite:**
+   Added `tests/test_ui_theme_charts.py` containing 7 dedicated unit and integration tests.
+4. **Final Test Suite Health:**
+   **116 passed in 9.09s (100% pass rate).**
 

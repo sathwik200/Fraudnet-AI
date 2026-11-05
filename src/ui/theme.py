@@ -72,14 +72,14 @@ def get_cyber_layout_dict(
             gridcolor="rgba(22, 139, 255, 0.12)",
             linecolor="rgba(0, 245, 255, 0.25)",
             tickfont=dict(color=TEXT_MUTED, size=10),
-            titlefont=dict(color=TEXT_PRIMARY, size=11),
+            title=dict(font=dict(color=TEXT_PRIMARY, size=11)),
             zerolinecolor="rgba(0, 245, 255, 0.2)",
         ),
         yaxis=dict(
             gridcolor="rgba(22, 139, 255, 0.12)",
             linecolor="rgba(0, 245, 255, 0.25)",
             tickfont=dict(color=TEXT_MUTED, size=10),
-            titlefont=dict(color=TEXT_PRIMARY, size=11),
+            title=dict(font=dict(color=TEXT_PRIMARY, size=11)),
             zerolinecolor="rgba(0, 245, 255, 0.2)",
         ),
         legend=(
