@@ -1,0 +1,54 @@
+# Python Bytecode & Cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+
+# Virtual Environments
+.venv/
+.venv_old/
+venv/
+ENV/
+env/
+
+# IDE & Editor Artifacts
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.agents/
+.claude/
+
+# Operating System Files
+.DS_Store
+**/.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Secrets & Environment Variables
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Testing & Linting Caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.log
+
+# Raw Datasets (Do NOT commit 658 MB raw CSVs to GitHub)
+data/raw/
+
+# Runtime Database & Generated Outputs (Ephemeral on Cloud)
+data/runtime/
+outputs/reports/*.pdf
+
+# NOTE ON PROCESSED DATA (data/processed/):
+# The processed data files (transactions.parquet [94.5MB], edges.parquet [2.45MB], 
+# transaction_graph.pkl [11.95MB], models/ [5.3MB]) are REQUIRED for deployment.
+# They are under GitHub's 100 MB hard limit.
+# Uncomment the line below ONLY if using Git LFS or external cloud storage:
+# data/processed/

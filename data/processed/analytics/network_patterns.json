@@ -1,0 +1,117 @@
+{
+  "thresholds": {
+    "aggregation_in_degree_threshold": 9.0,
+    "distribution_out_degree_threshold": 5.0
+  },
+  "counts": {
+    "aggregation_hubs_count": 2202,
+    "distribution_hubs_count": 2695,
+    "dual_hubs_count": 191,
+    "linear_pass_through_count": 74310
+  },
+  "top_aggregation_hubs": {
+    "43388675": {
+      "in_degree": 284,
+      "out_degree": 0,
+      "pagerank": 0.00047005811045770557
+    },
+    "68705820": {
+      "in_degree": 247,
+      "out_degree": 0,
+      "pagerank": 0.0003654438215214848
+    },
+    "30699343": {
+      "in_degree": 241,
+      "out_degree": 0,
+      "pagerank": 0.000371680620682067
+    },
+    "96576418": {
+      "in_degree": 239,
+      "out_degree": 0,
+      "pagerank": 0.0003936416559669593
+    },
+    "225859042": {
+      "in_degree": 212,
+      "out_degree": 0,
+      "pagerank": 0.0005207456704946926
+    },
+    "279187194": {
+      "in_degree": 211,
+      "out_degree": 0,
+      "pagerank": 0.00013390273779015927
+    },
+    "234890810": {
+      "in_degree": 199,
+      "out_degree": 0,
+      "pagerank": 0.000306251361409552
+    },
+    "196107869": {
+      "in_degree": 188,
+      "out_degree": 0,
+      "pagerank": 0.00033490538412407096
+    },
+    "43397277": {
+      "in_degree": 182,
+      "out_degree": 0,
+      "pagerank": 0.00030249805831857187
+    },
+    "68706499": {
+      "in_degree": 178,
+      "out_degree": 0,
+      "pagerank": 0.00026216683773407106
+    }
+  },
+  "top_distribution_hubs": {
+    "2984918": {
+      "in_degree": 1,
+      "out_degree": 472,
+      "pagerank": 1.960597033758738e-06
+    },
+    "89273": {
+      "in_degree": 1,
+      "out_degree": 288,
+      "pagerank": 2.306262799284898e-06
+    },
+    "102570": {
+      "in_degree": 0,
+      "out_degree": 122,
+      "pagerank": 1.7877641509956574e-06
+    },
+    "3181": {
+      "in_degree": 1,
+      "out_degree": 112,
+      "pagerank": 3.3432600958633794e-06
+    },
+    "7952": {
+      "in_degree": 1,
+      "out_degree": 99,
+      "pagerank": 2.306262799284898e-06
+    },
+    "1891081": {
+      "in_degree": 0,
+      "out_degree": 95,
+      "pagerank": 1.7877641509956574e-06
+    },
+    "143705": {
+      "in_degree": 0,
+      "out_degree": 92,
+      "pagerank": 1.7877641509956574e-06
+    },
+    "565334": {
+      "in_degree": 1,
+      "out_degree": 90,
+      "pagerank": 2.306262799284898e-06
+    },
+    "488266": {
+      "in_degree": 1,
+      "out_degree": 88,
+      "pagerank": 2.44798038126473e-06
+    },
+    "793584": {
+      "in_degree": 1,
+      "out_degree": 82,
+      "pagerank": 1.870708110191618e-06
+    }
+  },
+  "forensic_guidance": "Aggregation and distribution points are structural characteristics of payment networks (e.g., exchange sweeps, mining pool distributions, payment processors). They indicate transaction volume concentration, not confirmed illicit behavior."
+}
