@@ -74,6 +74,8 @@ def compile_investigation_dossier(tx_id: int) -> Dict[str, any]:
             "in_degree": in_deg,
             "out_degree": out_deg,
             "total_degree": metrics.get("total_degree", in_deg + out_deg),
+            "direct_predecessors_count": in_deg,
+            "direct_successors_count": out_deg,
             "pagerank": metrics.get("pagerank", 0.0),
             "community_id": metrics.get("community_id", 0),
             "wcc_size": metrics.get("wcc_size", 0),

@@ -186,8 +186,8 @@ def synthesize_forensics_node(state: InvestigationState) -> Dict[str, Any]:
             comm_id = metrics.get("community_id", -1)
             time_step = profile.get("time_step", "N/A")
             explain = profile.get("explainability", {})
-            top_elevating = explain.get("top_risk_elevating", [])
-            top_mitigating = explain.get("top_risk_mitigating", [])
+            top_deviations_above = explain.get("top_deviations_above", explain.get("top_risk_elevating", []))
+            top_deviations_below = explain.get("top_deviations_below", explain.get("top_risk_mitigating", []))
 
             # Evidence-based AML Typology classification
             typology_info = classify_aml_typology(
@@ -201,16 +201,16 @@ def synthesize_forensics_node(state: InvestigationState) -> Dict[str, Any]:
             typology_obs = typology_info["supporting_observations"]
             typology_note = typology_info["compliance_note"]
 
-            # Feature attribution explanation bullets
+            # Feature baseline deviation explanation bullets
             feat_bullets = ""
-            for f in top_elevating[:4]:
-                feat_bullets += f"- **[ELEVATING] {f.get('feature')}**: value={f.get('value')}, z-score={f.get('z_score', 0):+.2f} ({f.get('reason', '')})\n"
-            for f in top_mitigating[:2]:
-                feat_bullets += f"- **[MITIGATING] {f.get('feature')}**: value={f.get('value')}, z-score={f.get('z_score', 0):+.2f} ({f.get('reason', '')})\n"
+            for f in top_deviations_above[:3]:
+                feat_bullets += f"- **[ABOVE BASELINE] {f.get('feature')}**: observed={f.get('value')}, z-score={f.get('z_score', 0):+.2f} ({f.get('explanation', '')})\n"
+            for f in top_deviations_below[:3]:
+                feat_bullets += f"- **[BELOW BASELINE] {f.get('feature')}**: observed={f.get('value')}, z-score={f.get('z_score', 0):+.2f} ({f.get('explanation', '')})\n"
 
             if not feat_bullets:
                 if not explain.get("attribution_available", True):
-                    feat_bullets = "- Feature attribution unavailable for this transaction record.\n"
+                    feat_bullets = "- Feature baseline deviation profile unavailable for this transaction record.\n"
                 else:
                     feat_bullets = "- No significant local feature anomalies observed deviating from the licit baseline (|z| < 1.5).\n"
 
@@ -232,7 +232,7 @@ def synthesize_forensics_node(state: InvestigationState) -> Dict[str, Any]:
 - **Assigned Risk Tier:** **{risk_cat.upper()}**
 
 **Forensic Evaluation:**
-Transaction `{tx_id}` exhibits an illicit probability score of **{prob:.4f}**, placing it in the **{risk_cat}** risk band. In the historical record, its verified ground-truth label is `{gt_label}`. Note that dataset labels reflect academic research benchmarks and do not independently establish criminal conduct.
+Transaction `{tx_id}` exhibits an illicit probability score of **{prob:.4f}**, placing it in the **{risk_cat}** risk band. In the historical record, its verified ground-truth label is `{gt_label}`. Note that dataset labels reflect academic research benchmarks and do not independently establish criminal conduct or unlawful activity.
 
 ---
 
@@ -251,8 +251,9 @@ The transaction acts as a node within Community #{comm_id}. With {in_deg} global
 
 ---
 
-## 3. Machine Learning Attribution & Feature Anomalies
-**Attribution Methodology:** Standardized Feature Deviation (Z-score) × Random Forest Gini Impurity Importance
+## 3. Local Feature Deviations from Licit Baseline
+**Profiling Methodology:** Standardized Z-Score Baseline Deviations (Descriptive non-causal profiling vs licit class)  
+*Note: Deviations describe statistical variance from the empirical licit training baseline. Global Random Forest Gini importances reflect tree split impurity and do not represent local directional risk causality.*
 
 {feat_bullets}
 ---

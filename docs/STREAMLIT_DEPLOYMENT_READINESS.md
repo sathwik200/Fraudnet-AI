@@ -15,7 +15,7 @@ This audit evaluates the readiness of FRAUDNET AI for public or private hosting 
 | Audit Area | Status | Findings / Remediation |
 | :--- | :---: | :--- |
 | **Streamlit Entry Point** | ✅ **READY** | `app.py` in project root; launch command: `streamlit run app.py` |
-| **Test Suite Health** | ✅ **READY** | **143 / 143 automated tests passing (100% pass rate in ~10.5s)** |
+| **Test Suite Health** | ✅ **READY** | **145 / 145 automated tests passing (100% pass rate in ~9.8s)** |
 | **Path Portability** | ✅ **READY** | Zero absolute paths in code; all paths derived via `Path(__file__)` |
 | **External File Dependencies**| ✅ **READY** | Zero dependencies outside project root; fully self-contained |
 | **Dependencies (`requirements.txt`)**| ✅ **READY** | Clean production dependencies file created with compatible versions |
@@ -425,7 +425,57 @@ NameError: name 'pd' is not defined
 
 ---
 
-## 15. Forensic Dossier Accuracy, Typology Evidence, and Compliance Audit
+## 16. Final Forensic Dossier Accuracy, Explainability, and Ethical Framing Audit
+
+### 16.1 Target Objectives & Defect Identification
+1. **Explainability & Mathematical Attribution Correctness:**
+   - In tree ensembles (Random Forest), global feature importance represents the reduction in Gini impurity across all tree splits. This value is strictly non-negative and global.
+   - Multiplying standardized Z-scores by global Gini importances (`local_impact = X_vec * global_weights`) does not constitute a valid local signed directional contribution (such as TreeSHAP). Reporting these products as "risk-increasing" or "risk-reducing" drivers was mathematically misleading.
+   - Per audit requirements, in the absence of fitted TreeSHAP values, this section must be framed descriptively as **"Local Feature Deviations from Licit Baseline"**, reporting deviations neutrally without assigning causal directional blame.
+2. **Graph Accuracy & Metric Consistency:**
+   - Verified that global in-degree, global out-degree, total degree, direct predecessors count, and direct successors count are calculated from the unified NetworkX graph partition.
+   - Ensured explicit distinction between global graph metrics and bounded ego-subgraph metrics (e.g. 1-hop rendered nodes capped at 30).
+   - Confirmed evidence-based typology assignment suppresses speculative typologies (e.g. peeling, mixing, arbitrage) whenever graph structure is ambiguous or lacks high-fan-in/out concentration.
+3. **Responsible Terminology & Ethical Compliance:**
+   - Confirmed all entity references address graph nodes as "transactions" or "counterparty transactions" (never individuals, wallet owners, or criminals).
+   - Elliptic dataset classifications are documented strictly as historical academic research labels that do not independently establish unlawful conduct or criminal guilt.
+   - Compliance recommendations strictly mandate human analyst review, Enhanced Due Diligence (EDD), and prohibit automated enforcement (no automated asset freezing or automated SAR filing).
+4. **Report Consistency & AI Execution Disclosure:**
+   - Synchronized metrics and descriptive terminology across the pure-Python PDF report (`src/reports/report_generator.py`), the Streamlit Transaction Search page (`src/ui/transaction_search.py`), and the agent nodes (`src/agents/nodes.py`).
+   - Accurately disclosed execution mode (`Deterministic Rule-Based Forensic Engine (Fallback / Offline Mode)` vs `Groq Cloud AI Synthesis`).
+
+### 16.2 Applied Remediations
+1. **Explainability Engine Refactoring (`src/ml/explainability.py`):**
+   - Refactored `explain_transaction_prediction` to generate descriptive baseline deviations:
+     - `top_deviations_above`: Positive Z-score deviations (`above_baseline`), sorted by standardized distance.
+     - `top_deviations_below`: Negative Z-score deviations (`below_baseline`), sorted by standardized distance.
+     - `top_deviations`: Largest overall absolute deviations (`|z|`).
+     - Neutral descriptive explanations: `"{feat} is {abs(z):.2f} std devs above baseline (value: {val})"` without assigning directional risk causality.
+     - Maintained backward-compatible aliases (`top_risk_elevating`, `top_risk_mitigating`, `top_drivers`) for zero regression.
+   - Declared methodology: `"Standardized Feature Baseline Deviation (Z-score profiling; Gini importance reference)"`.
+2. **PDF Dossier Synchronization (`src/reports/report_generator.py`):**
+   - Renamed Section 3 to: **"3. LOCAL FEATURE DEVIATIONS FROM LICIT BASELINE"**.
+   - Added methodology disclaimer distinguishing global Gini split importances from local descriptive standardized deviations.
+   - Updated tags to `[ABOVE BASELINE]` and `[BELOW BASELINE]` with neutral styling.
+   - Updated Section 5 compliance text to emphasize research dataset context.
+3. **Transaction Search Page Alignment (`src/ui/transaction_search.py`):**
+   - Updated header banner to: `// LOCAL FEATURE DEVIATIONS // EMPIRICAL LICIT BASELINE COMPARISON`.
+   - Renamed tabs to: `📈 POSITIVE BASELINE DEVIATIONS` and `📉 NEGATIVE BASELINE DEVIATIONS`.
+   - Replaced table column `"Forensic Implication"` with `"Descriptive Finding"`.
+   - Added explanatory caption detailing non-causal Z-score baseline comparison.
+4. **Forensic Agent Synchronization (`src/agents/nodes.py`, `src/agents/prompts.py`):**
+   - Updated deterministic fallback report Section 3 to: `## 3. Local Feature Deviations from Licit Baseline`.
+   - Updated prompt instructions to enforce descriptive reporting and human review mandates.
+5. **Dossier Compiler Enrichment (`src/analytics/transaction_investigation.py`):**
+   - Added explicit `direct_predecessors_count` and `direct_successors_count` to `global_graph_metrics` alongside `in_degree`, `out_degree`, and `total_degree`.
+
+### 16.3 Automated Verification & Test Results
+- Expanded `tests/test_forensic_dossier_accuracy.py` with:
+  - `test_descriptive_deviations_across_illicit_licit_unknown`: Verifies that deviations are descriptive, positive/negative deviations match directional flags, and causal risk claims are suppressed across illicit (`232629023`), licit (`232438397`), and unlabeled (`230425980`) transactions.
+  - `test_graph_metrics_across_ground_truth_classes`: Verifies graph degrees, predecessor/successor counts, and ego-subgraph boundaries across all classes.
+- **Full Test Suite Status:**
+  **145 passed in 9.77s (100% pass rate across 14 test modules).**
+
 
 ### 15.1 Defect & Inconsistency Audit
 A comprehensive audit of the forensic investigation engine, agent nodes, report generator, and network explorer identified several inconsistencies:

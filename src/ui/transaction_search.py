@@ -171,18 +171,19 @@ def render_transaction_search_page():
     st.markdown(
         """
         <div style="font-family:'Rajdhani',sans-serif; font-size:1.2rem; font-weight:700; color:#00F5FF; letter-spacing:1px; margin-bottom:8px;">
-            // LOCAL FEATURE ATTRIBUTION // EMPIRICAL LICIT BASELINE DEVIATIONS
+            // LOCAL FEATURE DEVIATIONS // EMPIRICAL LICIT BASELINE COMPARISON
         </div>
         """,
         unsafe_allow_html=True,
     )
+    st.caption("ℹ️ Local feature deviations compare observed values against the empirical licit training baseline (|z| score). Standardized deviations describe statistical variance and do not represent signed causal risk attribution.")
 
     tab_elev, tab_mit, tab_flows = st.tabs(
-        ["⚡ RISK-ELEVATING ANOMALIES", "🛡️ RISK-MITIGATING SIGNALS", "🔄 COUNTERPARTY CASH-FLOWS"]
+        ["📈 POSITIVE BASELINE DEVIATIONS", "📉 NEGATIVE BASELINE DEVIATIONS", "🔄 COUNTERPARTY CASH-FLOWS"]
     )
 
     with tab_elev:
-        elevating = explain.get("top_risk_elevating", [])
+        elevating = explain.get("top_deviations_above", explain.get("top_risk_elevating", []))
         if elevating:
             df_elev = pd.DataFrame(elevating)
             fig_elev = px.bar(
@@ -193,7 +194,7 @@ def render_transaction_search_page():
                 color="z_score",
                 color_continuous_scale=[[0, "#FFB547"], [1, "#FF3158"]],
                 labels={"z_score": "Standard Deviations (Z-Score)", "feature": "Feature"},
-                hover_data=["value", "reason"],
+                hover_data=["value", "explanation"],
             )
             fig_elev.update_layout(
                 yaxis=dict(autorange="reversed"),
@@ -203,22 +204,22 @@ def render_transaction_search_page():
             st.plotly_chart(fig_elev, use_container_width=True)
 
             st.dataframe(
-                df_elev[["feature", "value", "z_score", "reason"]].rename(
+                df_elev[["feature", "value", "z_score", "explanation"]].rename(
                     columns={
                         "feature": "Feature Identifier",
                         "value": "Observed Value",
-                        "z_score": "Deviations (Z)",
-                        "reason": "Forensic Implication",
+                        "z_score": "Baseline Deviation (Z)",
+                        "explanation": "Descriptive Finding",
                     }
                 ),
                 use_container_width=True,
                 hide_index=True,
             )
         else:
-            st.info("NO RISK-ELEVATING STATISTICAL ANOMALIES DETECTED FOR THIS TRANSACTION.")
+            st.info("NO POSITIVE STATISTICAL ANOMALIES DETECTED FOR THIS TRANSACTION (|z| < 1.5).")
 
     with tab_mit:
-        mitigating = explain.get("top_risk_mitigating", [])
+        mitigating = explain.get("top_deviations_below", explain.get("top_risk_mitigating", []))
         if mitigating:
             df_mit = pd.DataFrame(mitigating)
             fig_mit = px.bar(
@@ -229,7 +230,7 @@ def render_transaction_search_page():
                 color="z_score",
                 color_continuous_scale=[[0, "#00FF9C"], [1, "#168BFF"]],
                 labels={"z_score": "Standard Deviations (Z-Score)", "feature": "Feature"},
-                hover_data=["value", "reason"],
+                hover_data=["value", "explanation"],
             )
             fig_mit.update_layout(
                 yaxis=dict(autorange="reversed"),
@@ -239,19 +240,19 @@ def render_transaction_search_page():
             st.plotly_chart(fig_mit, use_container_width=True)
 
             st.dataframe(
-                df_mit[["feature", "value", "z_score", "reason"]].rename(
+                df_mit[["feature", "value", "z_score", "explanation"]].rename(
                     columns={
                         "feature": "Feature Identifier",
                         "value": "Observed Value",
-                        "z_score": "Deviations (Z)",
-                        "reason": "Forensic Implication",
+                        "z_score": "Baseline Deviation (Z)",
+                        "explanation": "Descriptive Finding",
                     }
                 ),
                 use_container_width=True,
                 hide_index=True,
             )
         else:
-            st.info("NO RISK-MITIGATING ANOMALIES DETECTED.")
+            st.info("NO NEGATIVE STATISTICAL ANOMALIES DETECTED FOR THIS TRANSACTION (|z| < 1.5).")
 
     with tab_flows:
         neigh = get_transaction_neighborhood(tx_id, hops=1, max_nodes=40)

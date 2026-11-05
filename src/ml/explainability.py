@@ -60,15 +60,26 @@ def explain_transaction_prediction(
     top_n: int = 5,
 ) -> Dict[str, any]:
     """
-    Generate local feature attribution and investigative justification for a transaction.
+    Generate descriptive local feature deviations from empirical licit baseline for a transaction.
+
+    EXPLAINABILITY & ATTRIBUTION METHODOLOGY NOTE:
+    The supervised classifier utilizes a Random Forest whose feature importances reflect global
+    Gini impurity reduction across tree splits. Gini importances are strictly non-negative and
+    global; multiplying them by local signed Z-scores does not constitute a mathematically sound
+    local directional Shapley or TreeSHAP contribution.
+    
+    Consequently, local feature behavior is reported descriptively as standardized baseline
+    deviations (Z-scores) comparing the transaction to the training licit class distribution.
+    Features with elevated positive or negative deviations are presented transparently without
+    assigning speculative directional causality.
 
     Args:
         transaction_row: Row containing transaction features.
         model_bundle: Optional preloaded model bundle.
-        top_n: Number of primary drivers to return.
+        top_n: Number of primary deviations to return.
 
     Returns:
-        Structured explanation dict with top contributors, direction, and narrative summary.
+        Structured explanation dict with descriptive baseline deviations and narrative summary.
     """
     bundle = model_bundle or load_model_bundle()
     clf = bundle["model"]
@@ -83,10 +94,10 @@ def explain_transaction_prediction(
     else:
         df_row = transaction_row.copy()
 
-    # Transformed (imputed and standardized) feature values
+    # Transformed (imputed and standardized) feature values (Z-scores)
     X_vec = pipeline.transform(df_row)[0]
 
-    # Model importance weights
+    # Global model importance weights (for reference ranking)
     if hasattr(clf, "feature_importances_"):
         global_weights = clf.feature_importances_
     elif hasattr(clf, "coef_"):
@@ -94,71 +105,97 @@ def explain_transaction_prediction(
     else:
         global_weights = np.ones(len(feature_names)) / len(feature_names)
 
-    # Local contribution proxy: product of global importance and standardized deviation
-    local_impact = X_vec * global_weights
+    # Sort deviations:
+    # 1. Highest positive deviations above baseline (z > 0)
+    # 2. Lowest negative deviations below baseline (z < 0)
+    # 3. Overall largest absolute deviations (|z|)
+    pos_indices = [i for i in range(len(feature_names)) if X_vec[i] > 0]
+    neg_indices = [i for i in range(len(feature_names)) if X_vec[i] < 0]
+    all_indices = list(range(len(feature_names)))
 
-    # Positive impact pushes score towards illicit (1); negative towards licit (0)
-    top_illicit_indices = np.argsort(local_impact)[::-1][:top_n]
-    top_licit_indices = np.argsort(local_impact)[:top_n]
+    sorted_pos = sorted(pos_indices, key=lambda i: X_vec[i], reverse=True)[:top_n]
+    sorted_neg = sorted(neg_indices, key=lambda i: X_vec[i])[:top_n]
+    sorted_all = sorted(all_indices, key=lambda i: abs(X_vec[i]), reverse=True)[: top_n * 2]
 
-    drivers = []
-    top_elevating = []
-    top_mitigating = []
-
-    for idx in top_illicit_indices:
+    top_deviations_above = []
+    for idx in sorted_pos:
         feat = feature_names[idx]
         z_score = float(X_vec[idx])
-        impact = float(local_impact[idx])
         val = round(float(df_row[feat].iloc[0]), 4) if feat in df_row else 0.0
-        d_item = {
+        g_imp = round(float(global_weights[idx]), 4)
+        item = {
             "feature": feat,
             "value": val,
             "z_score": round(z_score, 2),
-            "impact_direction": "increases_risk",
-            "impact_score": round(impact, 4),
-            "reason": f"{feat} is {abs(z_score):.1f} std devs {'above' if z_score > 0 else 'below'} normal, elevating estimated risk.",
-            "explanation": f"{feat} is {abs(z_score):.1f} std devs {'above' if z_score > 0 else 'below'} normal, elevating estimated risk.",
+            "abs_z_score": round(abs(z_score), 2),
+            "deviation_direction": "above_baseline",
+            "global_importance": g_imp,
+            "impact_direction": "above_baseline",
+            "reason": f"{feat} is {abs(z_score):.2f} standard deviations above the empirical licit baseline (observed: {val}).",
+            "explanation": f"{feat} is {abs(z_score):.2f} std devs above baseline (value: {val}).",
         }
-        drivers.append(d_item)
-        if impact > 0:
-            top_elevating.append(d_item)
+        top_deviations_above.append(item)
 
-    for idx in top_licit_indices:
+    top_deviations_below = []
+    for idx in sorted_neg:
         feat = feature_names[idx]
         z_score = float(X_vec[idx])
-        impact = float(local_impact[idx])
         val = round(float(df_row[feat].iloc[0]), 4) if feat in df_row else 0.0
-        d_item = {
+        g_imp = round(float(global_weights[idx]), 4)
+        item = {
             "feature": feat,
             "value": val,
             "z_score": round(z_score, 2),
-            "impact_direction": "decreases_risk",
-            "impact_score": round(impact, 4),
-            "reason": f"{feat} aligns closely with baseline licit behavior, reducing estimated risk.",
-            "explanation": f"{feat} aligns closely with baseline licit behavior, reducing estimated risk.",
+            "abs_z_score": round(abs(z_score), 2),
+            "deviation_direction": "below_baseline",
+            "global_importance": g_imp,
+            "impact_direction": "below_baseline",
+            "reason": f"{feat} is {abs(z_score):.2f} standard deviations below the empirical licit baseline (observed: {val}).",
+            "explanation": f"{feat} is {abs(z_score):.2f} std devs below baseline (value: {val}).",
         }
-        drivers.append(d_item)
-        if impact < 0:
-            top_mitigating.append(d_item)
+        top_deviations_below.append(item)
 
-    has_sig = any(abs(d["z_score"]) >= 1.5 for d in drivers)
+    top_deviations = []
+    for idx in sorted_all:
+        feat = feature_names[idx]
+        z_score = float(X_vec[idx])
+        val = round(float(df_row[feat].iloc[0]), 4) if feat in df_row else 0.0
+        g_imp = round(float(global_weights[idx]), 4)
+        direction = "above_baseline" if z_score >= 0 else "below_baseline"
+        item = {
+            "feature": feat,
+            "value": val,
+            "z_score": round(z_score, 2),
+            "abs_z_score": round(abs(z_score), 2),
+            "deviation_direction": direction,
+            "global_importance": g_imp,
+            "impact_direction": direction,
+            "reason": f"{feat} is {abs(z_score):.2f} standard deviations {'above' if z_score >= 0 else 'below'} baseline (observed: {val}).",
+            "explanation": f"{feat} is {abs(z_score):.2f} std devs {'above' if z_score >= 0 else 'below'} baseline (value: {val}).",
+        }
+        top_deviations.append(item)
+
+    has_sig = any(abs(d["z_score"]) >= 1.5 for d in top_deviations)
     narrative = (
-        f"Feature attribution via standardized deviations (Z-score) and Gini feature importances. "
-        f"{'Observed significant statistical deviations.' if has_sig else 'No extreme statistical outliers detected against licit baseline (|z| < 1.5).'}"
+        f"Local feature deviations from empirical licit baseline. "
+        f"{'Observed significant statistical deviations (|z| >= 1.5).' if has_sig else 'No extreme statistical outliers detected against licit baseline (|z| < 1.5).'}"
     )
 
     return {
         "attribution_available": True,
-        "methodology": "Standardized Feature Baseline Deviation (Z-score) × Random Forest Gini Impurity Importance",
+        "methodology": "Standardized Feature Baseline Deviation (Z-score profiling; Gini importance reference)",
         "has_significant_anomalies": has_sig,
-        "top_drivers": drivers,
-        "top_risk_elevating": top_elevating,
-        "top_risk_mitigating": top_mitigating,
+        "top_deviations": top_deviations[:top_n],
+        "top_deviations_above": top_deviations_above,
+        "top_deviations_below": top_deviations_below,
+        "top_drivers": top_deviations[:top_n],
+        "top_risk_elevating": top_deviations_above,
+        "top_risk_mitigating": top_deviations_below,
         "narrative": narrative,
         "uncertainty_note": (
-            "Model predictions and feature attributions reflect statistical associations with labeled training examples. "
-            "They are forensic investigative leads, not legal proof of fraud or illicit activity. "
-            "All findings must be independently corroborated by compliance officers."
+            "Statistical deviations describe empirical variance from the training baseline distribution. "
+            "In the absence of local Shapley tree values, deviations are reported descriptively and do "
+            "not assign directional causality or legal proof of wrongdoing. All findings require human review."
         ),
     }
 

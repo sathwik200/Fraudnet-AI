@@ -309,31 +309,33 @@ def generate_forensic_pdf_report(
     pdf.current_y -= 10
 
     # Section: Explainability & Predictive Drivers
-    pdf.add_text("3. TOP PREDICTIVE FEATURE DRIVERS", 50, pdf.current_y, size=11, bold=True, r=0.1, g=0.15, b=0.3)
+    pdf.add_text("3. LOCAL FEATURE DEVIATIONS FROM LICIT BASELINE", 50, pdf.current_y, size=11, bold=True, r=0.1, g=0.15, b=0.3)
     pdf.current_y -= 8
     pdf.add_line(50, pdf.current_y, 562, pdf.current_y, width=1.0, r=0.2, g=0.4, b=0.8)
-    pdf.current_y -= 16
+    pdf.current_y -= 14
 
     expl = dossier.get("explainability", {})
-    methodology_text = expl.get("methodology", "Standardized Feature Deviation (Z-score) × Model Gini Importance")
-    pdf.add_text(f"Attribution Method: {methodology_text}", 60, pdf.current_y, size=8, bold=False, r=0.4, g=0.4, b=0.4)
-    pdf.current_y -= 16
+    methodology_text = expl.get("methodology", "Standardized Feature Baseline Deviation (Z-score)")
+    pdf.add_text(f"Profiling Method: {methodology_text}", 60, pdf.current_y, size=8, bold=False, r=0.4, g=0.4, b=0.4)
+    pdf.current_y -= 11
+    pdf.add_text("Note: Reports standardized deviations (Z-scores) from empirical licit baseline without assuming directional causality.", 60, pdf.current_y, size=7, bold=False, r=0.5, g=0.5, b=0.5)
+    pdf.current_y -= 14
 
-    drivers = expl.get("top_drivers", [])[:6]
+    drivers = expl.get("top_deviations", expl.get("top_drivers", []))[:6]
 
     if drivers:
         for d in drivers:
             pdf.check_space(20)
-            is_risk = d.get("impact_direction") == "increases_risk"
-            bullet_r, bullet_g, bullet_b = (0.8, 0.2, 0.2) if is_risk else (0.1, 0.6, 0.3)
-            prefix = "[RISK ELEVATOR]" if is_risk else "[RISK MITIGATOR]"
+            is_above = d.get("deviation_direction") == "above_baseline" or d.get("z_score", 0) > 0
+            bullet_r, bullet_g, bullet_b = (0.7, 0.3, 0.1) if is_above else (0.1, 0.4, 0.7)
+            prefix = "[ABOVE BASELINE]" if is_above else "[BELOW BASELINE]"
 
             pdf.add_text(f"{prefix} {d.get('feature')}", 60, pdf.current_y, size=9, bold=True, r=bullet_r, g=bullet_g, b=bullet_b)
             pdf.current_y -= 12
             pdf.add_text(f"  {d.get('explanation')}", 75, pdf.current_y, size=8, r=0.3, g=0.3, b=0.3)
             pdf.current_y -= 15
     elif not expl.get("attribution_available", True):
-        pdf.add_text("Feature attribution unavailable for this transaction record.", 60, pdf.current_y, size=9)
+        pdf.add_text("Feature baseline profile unavailable for this transaction record.", 60, pdf.current_y, size=9)
         pdf.current_y -= 20
     else:
         pdf.add_text("No significant feature outliers detected against licit baseline (|z| < 1.5).", 60, pdf.current_y, size=9)
@@ -372,7 +374,7 @@ def generate_forensic_pdf_report(
     recs = dossier.get("compliance_recommendations", [
         "Human Review Required: Algorithmic risk scores serve as exploratory leads and must not trigger automated asset freezes or filings.",
         "Enhanced Due Diligence (EDD): Independently verify counterparty entities across block explorer records and licensed VASPs.",
-        "Corroboration: Ground-truth classifications reflect historical academic research datasets (Elliptic) and do not independently establish criminal guilt.",
+        "Corroboration: Ground-truth classifications reflect historical academic research datasets (Elliptic) and do not independently establish unlawful conduct or verified criminal activity.",
     ])
     for rec in recs:
         pdf.check_space(16)

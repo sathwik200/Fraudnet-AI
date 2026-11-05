@@ -83,6 +83,24 @@ class TestNetworkMetricConsistency(unittest.TestCase):
         self.assertLessEqual(bounded_m["rendered_nodes"], 30)
         self.assertEqual(bounded_m["hops_explored"], 1)
 
+    def test_graph_metrics_across_ground_truth_classes(self):
+        """Verify graph degrees and direct predecessor/successor counts across classes."""
+        samples = {
+            "illicit": 232629023,
+            "licit": 232438397,
+            "unknown": 230425980,
+        }
+        for label_type, tx_id in samples.items():
+            dossier = compile_investigation_dossier(tx_id)
+            gm = dossier["global_graph_metrics"]
+            bm = dossier["bounded_subgraph_metrics"]
+
+            self.assertEqual(gm["in_degree"], gm["direct_predecessors_count"])
+            self.assertEqual(gm["out_degree"], gm["direct_successors_count"])
+            self.assertEqual(gm["total_degree"], gm["in_degree"] + gm["out_degree"])
+            self.assertEqual(bm["hops_explored"], 1)
+            self.assertGreaterEqual(bm["rendered_nodes"], 1)
+
 
 class TestEvidenceBasedAMLTypology(unittest.TestCase):
     """Test strict evidence-based assignment and suppression of unsupported AML typologies."""
@@ -123,7 +141,7 @@ class TestEvidenceBasedAMLTypology(unittest.TestCase):
 
 
 class TestFeatureAttributionIntegrity(unittest.TestCase):
-    """Test feature attribution accuracy and transparency."""
+    """Test feature attribution accuracy, descriptive neutrality, and transparency."""
 
     def test_feature_attribution_methodology_disclosed(self):
         """Explainability payload must disclose methodology and baseline deviation status."""
@@ -132,10 +150,42 @@ class TestFeatureAttributionIntegrity(unittest.TestCase):
 
         self.assertTrue(explain.get("attribution_available"))
         self.assertIn("methodology", explain)
-        self.assertIn("Gini", explain["methodology"])
         self.assertIn("Z-score", explain["methodology"])
+        self.assertIn("top_deviations_above", explain)
+        self.assertIn("top_deviations_below", explain)
         self.assertIn("top_risk_elevating", explain)
         self.assertIn("top_risk_mitigating", explain)
+
+    def test_descriptive_deviations_across_illicit_licit_unknown(self):
+        """Deviations must be descriptive without claiming signed directional causality."""
+        # 232629023 (Illicit), 232438397 (Licit), 230425980 (Unknown)
+        test_txs = [232629023, 232438397, 230425980]
+
+        for tx_id in test_txs:
+            profile = get_full_transaction_profile(tx_id)
+            explain = profile["explainability"]
+
+            self.assertTrue(explain["attribution_available"])
+            self.assertIn("top_deviations_above", explain)
+            self.assertIn("top_deviations_below", explain)
+
+            # Check positive deviations
+            for item in explain["top_deviations_above"]:
+                self.assertGreater(item["z_score"], 0)
+                self.assertEqual(item["deviation_direction"], "above_baseline")
+                self.assertIn("above baseline", item["explanation"].lower())
+                self.assertNotIn("elevating estimated risk", item["explanation"].lower())
+
+            # Check negative deviations
+            for item in explain["top_deviations_below"]:
+                self.assertLess(item["z_score"], 0)
+                self.assertEqual(item["deviation_direction"], "below_baseline")
+                self.assertIn("below baseline", item["explanation"].lower())
+                self.assertNotIn("reducing estimated risk", item["explanation"].lower())
+
+            # Uncertainty note must state non-causal investigative lead
+            self.assertIn("deviations", explain["uncertainty_note"].lower())
+            self.assertIn("human review", explain["uncertainty_note"].lower())
 
 
 class TestResponsibleComplianceGuidance(unittest.TestCase):

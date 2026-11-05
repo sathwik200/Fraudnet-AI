@@ -62,19 +62,19 @@ Target Transaction ID: {tx_id}
 - Predicted Label: {ml_prediction.get('predicted_label', 'Unknown')}
 - Illicit Probability: {ml_prediction.get('illicit_probability', 0.0):.4f} ({ml_prediction.get('illicit_probability', 0.0) * 100:.1f}%)
 - Risk Category: {ml_prediction.get('risk_category', 'Unknown')}
-- Attribution Methodology: Standardized Feature Deviation (Z-score) × Model Gini Impurity Importance
-- Top Risk-Elevating Drivers:
-{json.dumps(ml_prediction.get('top_risk_elevating', profile.get('explainability', {}).get('top_risk_elevating', [])), indent=2)}
-- Top Risk-Mitigating Drivers:
-{json.dumps(ml_prediction.get('top_risk_mitigating', profile.get('explainability', {}).get('top_risk_mitigating', [])), indent=2)}
+- Feature Profiling Methodology: Standardized Feature Baseline Deviation (Z-score profiling vs licit class)
+- Top Features Above Baseline:
+{json.dumps(ml_prediction.get('top_deviations_above', profile.get('explainability', {}).get('top_deviations_above', profile.get('explainability', {}).get('top_risk_elevating', []))), indent=2)}
+- Top Features Below Baseline:
+{json.dumps(ml_prediction.get('top_deviations_below', profile.get('explainability', {}).get('top_deviations_below', profile.get('explainability', {}).get('top_risk_mitigating', []))), indent=2)}
 
 --- INSTRUCTIONS FOR INVESTIGATOR ---
 Provide a comprehensive, professional Forensic Investigation Report structured with:
 - ## 1. Executive Summary & Risk Rating
 - ## 2. Network Topology & Cash Flow Dynamics (Distinguish global partition degrees from bounded ego-subgraph metrics)
-- ## 3. Machine Learning Attribution & Feature Anomalies
+- ## 3. Local Feature Deviations from Licit Baseline (Report standardized deviations descriptively; do not assign directional risk causality from Gini importance)
 - ## 4. AML Typology Assessment (Assign a typology ONLY if supported by concrete graph observations; otherwise state 'Insufficient evidence to determine transaction typology')
-- ## 5. Responsible Compliance Recommendations (Recommend human analyst review and independent verification; no automated freezing)
+- ## 5. Responsible Compliance Recommendations (Recommend human analyst review and independent verification; no automated freezing or automated SAR filing)
 """
     return prompt
 
