@@ -4,8 +4,9 @@ Signature visual environment for inspecting directed payment flows, multi-hop
 counterparty clusters, and cash-flow vectors with glowing neon graph mechanics.
 """
 
-from typing import Dict, List
+from typing import Dict, List, Optional, Set
 import streamlit as st
+import pandas as pd
 import networkx as nx
 import plotly.graph_objects as go
 
@@ -74,6 +75,13 @@ def render_network_visualization_page():
     edges_data = neighborhood.get("edges", [])
     predecessors_count = neighborhood.get("direct_predecessors_count", 0)
     successors_count = neighborhood.get("direct_successors_count", 0)
+
+    if not nodes_data:
+        st.info(f"ℹ️ NO TOPOLOGY NODES LOCATED FOR TARGET TRANSACTION `tx_{tx_id}`.")
+        return
+
+    if len(nodes_data) == 1 and not edges_data:
+        st.info(f"ℹ️ TARGET TRANSACTION `tx_{tx_id}` IS AN ISOLATED VERTEX WITH ZERO DIRECTED PAYMENT EDGES IN THIS SUBGRAPH.")
 
     # High-Tech Telemetry KPI Cards
     m1, m2, m3, m4 = st.columns(4)

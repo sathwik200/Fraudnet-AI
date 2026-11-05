@@ -15,7 +15,7 @@ This audit evaluates the readiness of FRAUDNET AI for public or private hosting 
 | Audit Area | Status | Findings / Remediation |
 | :--- | :---: | :--- |
 | **Streamlit Entry Point** | ✅ **READY** | `app.py` in project root; launch command: `streamlit run app.py` |
-| **Test Suite Health** | ✅ **READY** | **124 / 124 automated tests passing (100% pass rate in ~9.4s)** |
+| **Test Suite Health** | ✅ **READY** | **132 / 132 automated tests passing (100% pass rate in ~10.0s)** |
 | **Path Portability** | ✅ **READY** | Zero absolute paths in code; all paths derived via `Path(__file__)` |
 | **External File Dependencies**| ✅ **READY** | Zero dependencies outside project root; fully self-contained |
 | **Dependencies (`requirements.txt`)**| ✅ **READY** | Clean production dependencies file created with compatible versions |
@@ -386,7 +386,42 @@ Two compounded root causes produced this failure:
 4. **Automated Verification Suite (`tests/test_transaction_search_presets.py`):**
    - Added 8 automated tests covering ground-truth validation, full profile retrieval, ML probabilities, graph neighborhoods, PDF report generation, and an end-to-end `streamlit.testing.v1.AppTest` interaction test.
 
-5. **Final Comprehensive Test Suite Health:**
+5. **Intermediate Test Suite Health:**
    **124 passed in 9.40s (100% pass rate).**
+
+---
+
+## 14. Production Hotfix: Network Topology Explorer `NameError` Resolution
+
+### 14.1 Defect Description
+Navigating to the **Bitcoin Payment Topology Explorer** (`src/ui/network_visualization.py`) raised a runtime exception in production:
+```text
+File "src/ui/network_visualization.py", line 238, in render_network_visualization_page
+    df_in = pd.DataFrame([
+NameError: name 'pd' is not defined
+```
+
+### 14.2 Root Cause Analysis
+- `pandas` was referenced as `pd.DataFrame` on lines 238 (Incoming Counterparty Inflows) and 261 (Outgoing Recipient Disbursements).
+- However, the top-level imports in [`src/ui/network_visualization.py`](file:///Users/sathwikm/Documents/FRAUDNET-AI/src/ui/network_visualization.py#L7-L18) imported `streamlit`, `networkx`, and `plotly.graph_objects`, but omitted `import pandas as pd`.
+- When rendering counterparty flow tables, Python threw `NameError: name 'pd' is not defined`.
+- An AST-based static scope analysis confirmed that `pd` was the sole missing import in the module.
+
+### 14.3 Applied Solution
+1. **Module Import Restoration (`src/ui/network_visualization.py`):**
+   Added `import pandas as pd` and type hints (`Optional`, `Set`) to the top-level module header.
+2. **Defensive Topology Boundary Handlers:**
+   - Added guard clauses for empty node neighborhoods (`if not nodes_data: st.info(...)`).
+   - Added user feedback for isolated transactions with zero incoming/outgoing directed edges (`if len(nodes_data) == 1 and not edges_data: st.info(...)`).
+   - Preserved graceful fallback messages when predecessor or successor lists are empty.
+3. **Automated Verification Suite (`tests/test_network_visualization.py`):**
+   Added 8 automated unit, integration, and Streamlit `AppTest` regression tests:
+   - Module import validation (`hasattr(nv, 'pd')`).
+   - Populated and empty DataFrame generation for both inflows and outflows.
+   - NetworkX spring layout embedding and node role/color assignment (purple diamond for focal center, red for illicit, green for licit, amber/cyan for unknown).
+   - Headless Streamlit `AppTest` navigation to `'🕸️ 03 // NETWORK TOPOLOGY'` asserting zero runtime exceptions.
+4. **Final Comprehensive Test Suite Health:**
+   **132 passed in 10.04s (100% pass rate).**
+
 
 
