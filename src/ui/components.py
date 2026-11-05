@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 import os
 import streamlit as st
 
-from config.settings import GROQ_API_KEY, GROQ_MODEL
+from config.settings import GROQ_API_KEY, GROQ_MODEL, get_groq_api_key, get_groq_model
 from src.ui.theme import CYAN, BLUE, GREEN, RED, AMBER, PURPLE
 from src.ui.styles import get_risk_badge_html
 
@@ -16,8 +16,10 @@ from src.ui.styles import get_risk_badge_html
 def render_command_header(module_title: str):
     """Render top operational command-centre status bar with live telemetry."""
     now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-    has_groq = bool(GROQ_API_KEY and GROQ_API_KEY.strip())
-    groq_label = f"GROQ//LLM-ONLINE [{GROQ_MODEL}]" if has_groq else "DETERMINISTIC//AML-RULES"
+    active_key = get_groq_api_key()
+    active_model = get_groq_model()
+    has_groq = bool(active_key)
+    groq_label = f"GROQ//READY [{active_model}]" if has_groq else "DETERMINISTIC//AML-RULES"
     groq_pill_class = "pill-cyan" if has_groq else "pill-amber"
 
     header_html = f"""

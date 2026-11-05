@@ -15,7 +15,7 @@ st.set_page_config(
 )
 
 import os
-from config.settings import GROQ_API_KEY, GROQ_MODEL
+from config.settings import GROQ_API_KEY, GROQ_MODEL, get_groq_api_key, get_groq_model
 from src.ui.styles import apply_custom_styles
 from src.ui.dashboard import render_dashboard_page
 from src.ui.transaction_search import render_transaction_search_page
@@ -67,8 +67,10 @@ def main():
             unsafe_allow_html=True,
         )
 
-        has_groq = bool(GROQ_API_KEY and GROQ_API_KEY.strip())
-        llm_label = f"<span class='active'>ONLINE [{GROQ_MODEL[:10]}...]</span>" if has_groq else "<span style='color:#FFB547;'>OFFLINE (DETERMINISTIC)</span>"
+        active_key = get_groq_api_key()
+        active_model = get_groq_model()
+        has_groq = bool(active_key)
+        llm_label = f"<span class='active'>READY [{active_model[:12]}]</span>" if has_groq else "<span style='color:#FFB547;'>OFFLINE (DETERMINISTIC)</span>"
 
         st.markdown(
             f"""

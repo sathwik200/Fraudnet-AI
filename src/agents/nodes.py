@@ -6,13 +6,21 @@ import re
 import logging
 from typing import Any, Dict, Optional
 
-from config.settings import GROQ_API_KEY, GROQ_MODEL, GROQ_TEMPERATURE
+from config.settings import (
+    DEFAULT_GROQ_MODEL,
+    GROQ_MAX_TOKENS,
+    GROQ_TEMPERATURE,
+    GROQ_TIMEOUT_SECONDS,
+    get_groq_api_key,
+    get_groq_model,
+)
 from src.agents.state import InvestigationState
 from src.agents.prompts import (
     SYSTEM_INVESTIGATION_PROMPT,
     build_investigation_prompt,
     build_general_query_prompt,
 )
+from src.agents.groq_client import generate_forensic_synthesis
 from src.tools.transaction_tools import get_full_transaction_profile
 from src.tools.graph_tools import get_transaction_neighborhood
 from src.analytics.typology import classify_aml_typology
@@ -120,60 +128,56 @@ def synthesize_forensics_node(state: InvestigationState) -> Dict[str, Any]:
     notes = list(state.get("notes", []))
 
     llm_used = False
+    execution_mode = "DETERMINISTIC FALLBACK"
+    fallback_reason: Optional[str] = None
     final_report = ""
 
-    # Check for active Groq API key from environment, settings, or Streamlit secrets
-    active_key = os.getenv("GROQ_API_KEY", "") or GROQ_API_KEY
-    if not active_key:
-        try:
-            import streamlit as st
-            if hasattr(st, "secrets") and "GROQ_API_KEY" in st.secrets:
-                active_key = str(st.secrets["GROQ_API_KEY"])
-        except Exception:
-            pass
+    active_key = get_groq_api_key()
+    active_model = get_groq_model()
 
     # Attempt LLM generation if Groq API key is present
     if active_key and active_key.strip():
-        try:
-            from langchain_groq import ChatGroq
-            from langchain_core.messages import HumanMessage, SystemMessage
-
-            llm = ChatGroq(
-                groq_api_key=active_key.strip(),
-                model_name=GROQ_MODEL,
-                temperature=GROQ_TEMPERATURE,
+        if tx_id and profile:
+            prompt_content = build_investigation_prompt(
+                query=query,
+                tx_id=str(tx_id),
+                profile=profile,
+                graph_context=graph_context,
+                ml_prediction=ml_prediction,
             )
+        else:
+            prompt_content = build_general_query_prompt(query)
 
-            if tx_id and profile:
-                prompt_content = build_investigation_prompt(
-                    query=query,
-                    tx_id=str(tx_id),
-                    profile=profile,
-                    graph_context=graph_context,
-                    ml_prediction=ml_prediction,
-                )
-            else:
-                prompt_content = build_general_query_prompt(query)
+        res = generate_forensic_synthesis(
+            system_prompt=SYSTEM_INVESTIGATION_PROMPT,
+            user_prompt=prompt_content,
+            api_key=active_key,
+            model=active_model,
+            temperature=GROQ_TEMPERATURE,
+            max_tokens=GROQ_MAX_TOKENS,
+            timeout=GROQ_TIMEOUT_SECONDS,
+        )
 
-            messages = [
-                SystemMessage(content=SYSTEM_INVESTIGATION_PROMPT),
-                HumanMessage(content=prompt_content),
-            ]
-
-            response = llm.invoke(messages)
-            llm_header = (
-                f"> **Execution Mode:** Groq Cloud AI Synthesis (Model: `{GROQ_MODEL}`)\n"
-                f"> **Inference Engine:** Generative AI Forensic Intelligence Agent\n\n---\n\n"
-            )
-            final_report = llm_header + str(response.content)
+        if res.get("success"):
             llm_used = True
-            notes.append(f"Investigation report generated using Groq LLM ({GROQ_MODEL}).")
-        except Exception as exc:
-            logger.warning(f"Groq LLM call failed ({exc}); falling back to deterministic synthesizer.")
-            notes.append(f"Groq API call unavailable ({exc}). Using deterministic forensic engine.")
+            execution_mode = "GROQ LIVE"
+            llm_header = (
+                f"> **Execution Mode:** GROQ LIVE\n"
+                f"> **Model:** `{active_model}`\n"
+                f"> **Inference Engine:** Groq Cloud AI Synthesis (Generative Forensic Intelligence Agent)\n\n---\n\n"
+            )
+            final_report = llm_header + str(res.get("content", ""))
+            notes.append(f"Investigation report synthesized live via Groq LLM ({active_model}).")
+        else:
+            fallback_reason = res.get("fallback_reason") or "Groq API call unavailable"
+            notes.append(f"Groq API call unavailable ({fallback_reason}). Local deterministic forensic engine engaged.")
+            logger.warning("Groq synthesis unavailable (%s); falling back to deterministic synthesizer.", fallback_reason)
+    else:
+        fallback_reason = "GROQ_API_KEY unconfigured"
 
     # Deterministic fallback when LLM was not used
     if not llm_used:
+        execution_mode = "DETERMINISTIC FALLBACK"
         if tx_id and profile:
             prob = ml_prediction.get("illicit_probability", 0.0)
             risk_cat = ml_prediction.get("risk_category", "Unknown")
@@ -219,7 +223,7 @@ def synthesize_forensics_node(state: InvestigationState) -> Dict[str, Any]:
 
             final_report = f"""# Forensic Investigation Dossier: Transaction `{tx_id}`
 
-> **Execution Mode:** Deterministic Rule-Based Forensic Engine (Fallback / Offline Mode)  
+> **Execution Mode:** DETERMINISTIC FALLBACK (Deterministic Rule-Based Forensic Engine)  
 > **Inference Engine:** Algorithmic Rule Synthesis (No external LLM API invoked)
 
 ---
@@ -290,5 +294,8 @@ To investigate a transaction immediately, enter:
     return {
         "final_report": final_report,
         "llm_used": llm_used,
+        "execution_mode": execution_mode,
+        "model_name": active_model,
+        "fallback_reason": fallback_reason,
         "notes": notes,
     }

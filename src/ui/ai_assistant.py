@@ -34,40 +34,61 @@ def render_ai_assistant_page():
     )
 
     # API Key Configuration Banner & Drawer
-    current_key = os.getenv("GROQ_API_KEY", "") or app_settings.GROQ_API_KEY
-    if not current_key.strip():
+    current_key = app_settings.get_groq_api_key()
+    current_model = app_settings.get_groq_model()
+
+    from src.agents.groq_client import verify_groq_connectivity, mask_api_key
+
+    if not current_key:
         st.markdown(
             """
             <div class="cyber-terminal-box" style="border-left: 3px solid #FFB547; margin-bottom:14px;">
                 <span class="cyber-terminal-prompt">[SYSTEM NOTICE]</span>
-                <strong>GROQ CLOUD API KEY UNCONFIGURED:</strong> Operating in high-precision <strong>DETERMINISTIC FORENSIC ENGINE MODE</strong>. 
-                Full topological analytics and supervised ML attribution remain active.
+                <strong>EXECUTION MODE: DETERMINISTIC FALLBACK</strong> — GROQ_API_KEY unconfigured. 
+                Operating in high-precision rule-based forensic mode. Full topological analytics and supervised ML attribution remain active.
             </div>
             """,
             unsafe_allow_html=True,
         )
-        with st.expander("🔑 CONFIGURE / INJECT GROQ CLOUD API KEY (OPTIONAL)"):
-            new_key = st.text_input(
-                "Enter Groq API Key (e.g., gsk_...):",
-                type="password",
-                help="Obtain key from https://console.groq.com",
-            )
-            if st.button("AUTHENTICATE GROQ LLM"):
-                if new_key.strip():
-                    os.environ["GROQ_API_KEY"] = new_key.strip()
-                    app_settings.GROQ_API_KEY = new_key.strip()
-                    st.success("AUTHENTICATED: Groq Cloud LLM online.")
-                    st.rerun()
     else:
         st.markdown(
             f"""
-            <div class="cyber-terminal-box" style="border-left: 3px solid #00FF9C; margin-bottom:14px;">
-                <span class="cyber-terminal-prompt">[SYSTEM ONLINE]</span>
-                <strong>GROQ CLOUD LLM ACTIVE:</strong> Model <code>{app_settings.GROQ_MODEL}</code> connected for live cognitive synthesis.
+            <div class="cyber-terminal-box" style="border-left: 3px solid #00F5FF; margin-bottom:14px;">
+                <span class="cyber-terminal-prompt">[SYSTEM READY]</span>
+                <strong>GROQ API KEY CONFIGURED ({mask_api_key(current_key)}):</strong> Target Model: <code>{current_model}</code>. 
+                Execution mode will report <strong>GROQ LIVE</strong> only upon verified successful completion.
             </div>
             """,
             unsafe_allow_html=True,
         )
+
+    with st.expander("🔑 CONFIGURE / VERIFY GROQ CLOUD API"):
+        c1, c2 = st.columns([3, 1])
+        with c1:
+            new_key = st.text_input(
+                "Groq API Key:",
+                value="",
+                placeholder=f"Current: {mask_api_key(current_key)}",
+                type="password",
+                help="Key is securely stored in session/environment and never exposed or logged.",
+            )
+        with c2:
+            st.markdown("<div style='height:28px;'></div>", unsafe_allow_html=True)
+            if st.button("SET KEY", use_container_width=True):
+                if new_key.strip():
+                    os.environ["GROQ_API_KEY"] = new_key.strip()
+                    app_settings.GROQ_API_KEY = new_key.strip()
+                    st.success("API key registered in active session.")
+                    st.rerun()
+
+        st.caption(f"Configured Model: `{current_model}` (from `GROQ_MODEL` or default `openai/gpt-oss-120b`)")
+        if st.button("⚡ TEST LIVE GROQ CONNECTIVITY & MODEL AVAILABILITY"):
+            with st.spinner("Pinging Groq models endpoint & verifying completion..."):
+                verify_res = verify_groq_connectivity()
+            if verify_res.get("connected"):
+                st.success(f"✅ {verify_res.get('message')}")
+            else:
+                st.warning(f"⚠️ {verify_res.get('message')}")
 
     # Initialize chat history
     if "chat_messages" not in st.session_state:
@@ -115,8 +136,44 @@ def render_ai_assistant_page():
 
         # Run Multi-Step LangGraph Agent
         with st.chat_message("assistant"):
-            with st.spinner("EXECUTING LANGGRAPH STATE MACHINE // RETRIEVING TOPOLOGY & ML EVIDENCE..."):
-                result_state = run_investigation(query_to_run)
+            if "investigation_cache" not in st.session_state:
+                st.session_state["investigation_cache"] = {}
+
+            if query_to_run in st.session_state["investigation_cache"]:
+                result_state = st.session_state["investigation_cache"][query_to_run]
+            else:
+                with st.spinner("EXECUTING LANGGRAPH STATE MACHINE // RETRIEVING TOPOLOGY & ML EVIDENCE..."):
+                    result_state = run_investigation(query_to_run)
+                st.session_state["investigation_cache"][query_to_run] = result_state
+
+            # Execution Mode Indicator Banner
+            is_live = result_state.get("llm_used", False)
+            exec_mode = "GROQ LIVE" if is_live else "DETERMINISTIC FALLBACK"
+            exec_pill = "pill-cyan" if is_live else "pill-amber"
+            model_info = f" ({result_state.get('model_name', current_model)})" if is_live else ""
+
+            st.markdown(
+                f"""
+                <div style="margin-bottom:10px;">
+                    <span class="cyber-status-pill {exec_pill}" style="font-size:0.75rem; padding:4px 10px; font-weight:700;">
+                        {'⚡' if is_live else '🛡️'} EXECUTION MODE: {exec_mode}{model_info}
+                    </span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            fallback_reason = result_state.get("fallback_reason")
+            if not is_live and fallback_reason and fallback_reason != "GROQ_API_KEY unconfigured":
+                st.markdown(
+                    f"""
+                    <div class="cyber-terminal-box" style="border-left: 3px solid #FF3158; margin-bottom:10px; font-size:0.8rem; padding:8px 12px;">
+                        <span class="cyber-terminal-prompt">[NOTICE]</span>
+                        Groq inference unavailable ({fallback_reason}). High-precision deterministic fallback engaged.
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
 
             # Execution Step Telemetry
             notes = result_state.get("notes", [])

@@ -15,7 +15,7 @@ This audit evaluates the readiness of FRAUDNET AI for public or private hosting 
 | Audit Area | Status | Findings / Remediation |
 | :--- | :---: | :--- |
 | **Streamlit Entry Point** | ✅ **READY** | `app.py` in project root; launch command: `streamlit run app.py` |
-| **Test Suite Health** | ✅ **READY** | **145 / 145 automated tests passing (100% pass rate in ~9.8s)** |
+| **Test Suite Health** | ✅ **READY** | **162 / 162 automated tests passing (100% pass rate in ~9.5s)** |
 | **Path Portability** | ✅ **READY** | Zero absolute paths in code; all paths derived via `Path(__file__)` |
 | **External File Dependencies**| ✅ **READY** | Zero dependencies outside project root; fully self-contained |
 | **Dependencies (`requirements.txt`)**| ✅ **READY** | Clean production dependencies file created with compatible versions |
@@ -473,40 +473,59 @@ NameError: name 'pd' is not defined
 - Expanded `tests/test_forensic_dossier_accuracy.py` with:
   - `test_descriptive_deviations_across_illicit_licit_unknown`: Verifies that deviations are descriptive, positive/negative deviations match directional flags, and causal risk claims are suppressed across illicit (`232629023`), licit (`232438397`), and unlabeled (`230425980`) transactions.
   - `test_graph_metrics_across_ground_truth_classes`: Verifies graph degrees, predecessor/successor counts, and ego-subgraph boundaries across all classes.
-- **Full Test Suite Status:**
-  **145 passed in 9.77s (100% pass rate across 14 test modules).**
+- **Pass Rate:** 100% (All assertions validated).
 
+---
 
-### 15.1 Defect & Inconsistency Audit
-A comprehensive audit of the forensic investigation engine, agent nodes, report generator, and network explorer identified several inconsistencies:
-1. **Network Metric Discrepancy:** In `src/agents/nodes.py`, the agent attempted to read `ego.get("predecessors", [])` and `ego.get("successors", [])`. Because `get_transaction_neighborhood` previously returned `direct_predecessors_count` and `direct_predecessors_sample`, the predecessor and successor lists defaulted to empty lists (`[]`). This resulted in an out-degree of 1 being reported alongside 0 direct successors in the agent dossier.
-2. **Unsupported AML Typology Attribution:** Standard transactions (e.g. 1-in / 1-out or arbitrary connectivity) were defaulted to "Standard Mesh Flow / Arbitrage" or "Linear Pass-Through Relay (Intermediate Layering)" without sufficient topological evidence.
-3. **Feature Attribution Clarity:** The report generator and agent did not clearly distinguish between records with no significant statistical deviations (|z| < 1.5) and records where feature attribution was unavailable. The mathematical attribution methodology was not explicitly declared.
-4. **Non-Compliant Action Directives:** Agent reports contained unsupported directives such as "flag address for enhanced SAR filing and freeze counterparty hops", which violated AML compliance principles prioritizing human review and independent corroboration.
-5. **AI Execution Transparency:** The dossier did not clearly distinguish between Groq Cloud LLM synthesis and the offline deterministic rule-based fallback engine.
+## 17. Groq API Integration, Live Verification & Reliability Audit
 
-### 15.2 Applied Solutions
-1. **Topological Metric Synchronization (`src/tools/graph_tools.py`):**
-   - Updated `get_transaction_neighborhood` to return `predecessors`, `successors`, `global_in_degree`, and `global_out_degree` alongside sample arrays.
-   - Guaranteed that global in-degree strictly equals `direct_predecessors_count` and global out-degree strictly equals `direct_successors_count`.
-   - Dossier explicitly distinguishes global partition degrees from bounded ego-subgraph rendered nodes.
-2. **Evidence-Based AML Typology Classifier (`src/analytics/typology.py`):**
-   - Implemented `classify_aml_typology`: Typologies (e.g. High Fan-In Aggregation Hub, High Fan-Out Distribution Hub, Direct Point-to-Point Transfer) require concrete topological thresholds (fan-in/fan-out ratios, 99th percentile hub verification).
-   - Ambiguous or low-degree topologies strictly report: `"Insufficient evidence to determine transaction typology"`.
-   - Every classification provides concrete supporting graph observations.
-3. **Feature Attribution Transparency (`src/ml/explainability.py`):**
-   - Declared attribution methodology: `Standardized Feature Baseline Deviation (Z-score) × Random Forest Gini Impurity Importance`.
-   - Added `attribution_available` and `has_significant_anomalies` flags.
-   - Transparently states: `"No significant local feature anomalies observed deviating from the licit baseline (|z| < 1.5)"` when deviations are within normal bounds.
-4. **Responsible Compliance Guidance (`src/agents/nodes.py`, `src/reports/report_generator.py`):**
-   - Replaced automatic freeze/SAR text with mandatory recommendations for human analyst review, Enhanced Due Diligence (EDD), and independent verification across blockchain explorer ledgers.
-   - Emphasized that Elliptic dataset classifications reflect historical academic research benchmarks and do not independently establish criminal guilt.
-5. **Execution Transparency Disclosure (`src/agents/nodes.py`, `src/reports/report_generator.py`):**
-   - Dossier and PDF report headers explicitly disclose execution mode: `Deterministic Rule-Based Forensic Engine (Fallback / Offline Mode)` or `Groq Cloud AI Synthesis (Model: llama-3.3-70b-versatile)`.
-6. **Automated Regression Suite (`tests/test_forensic_dossier_accuracy.py`):**
-   - Added 11 automated unit and integration tests covering metric consistency, typology suppression, attribution integrity, compliance safety, and cross-module consistency.
-7. **Final Comprehensive Test Suite Health:**
-   **143 passed in 10.50s (100% pass rate).**
+### 17.1 Configuration & Model Default
+- **Environment & Secrets Integration:** `GROQ_API_KEY` and `GROQ_MODEL` are dynamically and securely loaded via `get_groq_api_key()` and `get_groq_model()` from `st.secrets` (Streamlit Community Cloud) with fallback to `os.environ` (local environment).
+- **Default Model:** When `GROQ_MODEL` is not explicitly set, the platform strictly defaults to `openai/gpt-oss-120b`.
+- **Zero Exposure Guarantee:** API keys are never printed, logged, or exposed in UI telemetry. The helper `mask_api_key()` displays only masked previews (`gsk_...xxxx`) or `[NOT CONFIGURED]`. Error messages are scrubbed with `sanitize_error_message()` to strip any Bearer tokens or credential substrings.
+- **Git Security:** `.env`, `.env.*`, and `.streamlit/secrets.toml` are strictly excluded in `.gitignore`.
+
+### 17.2 Official Groq SDK Client & Connectivity Engine
+- **Engine Module:** Implemented in `src/agents/groq_client.py` using official `groq.Groq` SDK.
+- **Model Discovery & Verification:**
+  - `verify_groq_connectivity()` calls Groq's official `client.models.list()` endpoint.
+  - Verifies that the configured model (`openai/gpt-oss-120b` or custom) is actively available on Groq Cloud.
+  - **No Silent Model Substitution:** If the configured model is deprecated or unavailable, the system reports `MODEL_UNAVAILABLE` clearly and falls back to the deterministic engine without secretly switching models.
+  - Sends a minimal verification completion (`Ping` -> `VERIFIED`) to test inference capability.
+- **Error Handling:** Explicitly traps `groq.AuthenticationError`, `groq.RateLimitError`, `groq.APIConnectionError`, and `groq.APITimeoutError`.
+
+### 17.3 LangGraph Investigation Workflow Integration
+- **Preserved Pipeline:** The autonomous 5-node LangGraph state machine remains fully intact:
+  `extract_entities ➔ fetch_profile ➔ fetch_network_context ➔ fetch_prediction ➔ synthesize_forensics`
+- **Factual Grounding:**
+  - ML fraud probability is computed locally via the trained scikit-learn Random Forest model.
+  - Graph degrees, PageRank, and Louvain communities are computed locally via NetworkX.
+  - Feature baseline deviations are calculated locally via the standardized explainability engine.
+  - Groq receives the exact factual evidence dossier and generates the natural-language forensic synthesis.
+  - Prompts strictly forbid fabricating missing counterparties or transaction attributes.
+  - Responsible compliance guidance is enforced: academic Elliptic labels do not establish legal guilt, and human analyst review is mandated with no automated freezing.
+
+### 17.4 Execution Mode Visibility & Reliability
+- **Explicit Modes:**
+  - `GROQ LIVE`: Active **only** after a real, verified Groq completion is returned.
+  - `DETERMINISTIC FALLBACK`: Active when the key is unconfigured or if an API call fails.
+- **UI Enhancements (`src/ui/ai_assistant.py`):**
+  - Displays mode badges: cyan `⚡ EXECUTION MODE: GROQ LIVE (Model: ...)` or amber `🛡️ EXECUTION MODE: DETERMINISTIC FALLBACK`.
+  - Non-sensitive status notices inform the user of API rate limits or connection errors without crashing.
+  - In-session investigation caching (`st.session_state["investigation_cache"]`) prevents duplicate Groq API calls on UI reruns.
+
+### 17.5 Automated Test Suite Health
+- **Test File:** `tests/test_groq_integration.py` (17 automated unit and integration tests covering secrets loading, missing key handling, model discovery, mocked live completions, malformed responses, auth failure, rate-limit handling, execution mode reporting, fallback resilience, prompt fidelity, and secret sanitization).
+- **Comprehensive Suite Health:** **162 / 162 tests passing in 9.49s (100% pass rate across 15 test modules).**
+
+### 17.6 Troubleshooting Common API Failures
+| Symptom / Error | Root Cause | Automated Remediation & User Action |
+| :--- | :--- | :--- |
+| `MISSING_KEY` | `GROQ_API_KEY` not in `st.secrets` or `.env` | Engine operates in deterministic fallback mode. Add key to Streamlit Cloud Secrets. |
+| `AUTH_ERROR` | Key expired, revoked, or mistyped | Sanitized message displayed; fallback active. Regenerate key at https://console.groq.com/keys. |
+| `MODEL_UNAVAILABLE` | Configured model ID not found on Groq | System flags error without silent substitution. Check supported models in Groq Console. |
+| `RATE_LIMIT` (429) | Exceeded TPM / RPM quota on free tier | Safe fallback engages automatically. Wait for quota reset or upgrade Groq tier. |
+| `NETWORK_ERROR` | Cloud container connection timeout | Safe fallback engages automatically. System retries on subsequent user investigation. |
 
 
 

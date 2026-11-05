@@ -16,5 +16,8 @@ class InvestigationState(TypedDict, total=False):
     notes: List[str]
     final_report: str
     llm_used: bool
+    execution_mode: Optional[str]
+    model_name: Optional[str]
+    fallback_reason: Optional[str]
     error: Optional[str]
 
