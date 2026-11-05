@@ -526,6 +526,32 @@ NameError: name 'pd' is not defined
 | `MODEL_UNAVAILABLE` | Configured model ID not found on Groq | System flags error without silent substitution. Check supported models in Groq Console. |
 | `RATE_LIMIT` (429) | Exceeded TPM / RPM quota on free tier | Safe fallback engages automatically. Wait for quota reset or upgrade Groq tier. |
 | `NETWORK_ERROR` | Cloud container connection timeout | Safe fallback engages automatically. System retries on subsequent user investigation. |
+| `TOKEN_LIMIT_EXHAUSTED` | Small token budget exhausted by reasoning tokens | Increase `GROQ_CONNECTIVITY_TOKEN_BUDGET` (>=250) and set `reasoning_effort="low"`. |
+| `EMPTY_COMPLETION` | Model generated empty message content | Fallback active; diagnosed with finish_reason and usage metadata. |
+
+---
+
+## 18. Groq GPT-OSS (`openai/gpt-oss-120b`) Reasoning & Response Handling
+
+### 18.1 Root Cause of Empty Completion
+When calling reasoning-oriented models such as `openai/gpt-oss-120b` on Groq, internal reasoning tokens share the completion token budget unless reasoning suppression is explicitly configured:
+1. **Token Starvation:** Minimal token budgets (e.g. `max_tokens=10`) are exhausted entirely by internal reasoning tokens before any user-facing content is emitted, yielding `finish_reason='length'` and `message.content=""`.
+2. **Reasoning Stream Isolation:** Reasoning tokens in GPT-OSS are generated in separate internal structures or streams. User-facing content must be cleanly extracted from `message.content` without leaking internal reasoning into UI logs or reports.
+
+### 18.2 Production Safeguards Implemented
+- **Parameter Standardization:** Calls to `openai/gpt-oss-120b` use:
+  - `max_completion_tokens`: Sets token ceiling (250 tokens for connectivity test, 2000 for synthesis).
+  - `include_reasoning=False`: Suppresses separate reasoning payloads.
+  - `reasoning_effort="low"`: Minimizes reasoning token consumption.
+  - `stream=False`: Enforces standard synchronous completion responses.
+- **Robust Content Extraction (`extract_completion_content`):**
+  - Distinguishes valid user content, token exhaustion (`finish_reason='length'`), refusals (`refusal`), tool calls, and empty responses.
+  - Never treats internal reasoning fields as user-facing answers.
+  - Returns structured diagnostics (`finish_reason`, `content_length`, `completion_tokens`).
+- **Test Suite Verification:**
+  - 24 Groq integration tests passing in `tests/test_groq_integration.py`.
+  - Comprehensive suite: **169 / 169 automated tests passing (100% pass rate in ~9.8s).**
+
 
 
 

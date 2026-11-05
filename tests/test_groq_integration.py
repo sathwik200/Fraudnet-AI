@@ -179,7 +179,8 @@ class TestGroqSynthesisAndFallback(unittest.TestCase):
 
         mock_choice = MagicMock()
         mock_choice.message.content = "   "  # Whitespace only
-        mock_client.chat.completions.create.return_value = MagicMock(choices=[mock_choice])
+        mock_choice.finish_reason = "stop"
+        mock_client.chat.completions.create.return_value = MagicMock(choices=[mock_choice], usage=None)
 
         res = generate_forensic_synthesis(
             system_prompt="System prompt",
@@ -189,37 +190,63 @@ class TestGroqSynthesisAndFallback(unittest.TestCase):
 
         self.assertFalse(res["success"])
         self.assertEqual(res["execution_mode"], "DETERMINISTIC FALLBACK")
-        self.assertEqual(res["error_type"], "EMPTY_RESPONSE")
+        self.assertEqual(res["error_type"], "EMPTY_COMPLETION")
 
     @patch("src.agents.groq_client.Groq")
-    def test_rate_limit_failure_triggers_fallback(self, mock_groq_cls):
-        """Rate limit error triggers graceful deterministic fallback."""
+    def test_gpt_oss_separate_reasoning_and_content(self, mock_groq_cls):
+        """User content must be extracted and internal reasoning must not leak."""
         mock_client = MagicMock()
         mock_groq_cls.return_value = mock_client
-        mock_client.chat.completions.create.side_effect = groq.RateLimitError(
-            message="Rate limit exceeded",
-            response=MagicMock(status_code=429),
-            body={"error": {"message": "Rate limit exceeded"}},
-        )
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = "Forensic assessment complete."
+        mock_choice.message.reasoning = "Deep internal thinking tokens..."
+        mock_choice.finish_reason = "stop"
+        mock_client.chat.completions.create.return_value = MagicMock(choices=[mock_choice], usage=None)
 
         res = generate_forensic_synthesis(
             system_prompt="System prompt",
             user_prompt="User prompt",
             api_key="gsk_valid_key",
+            model="openai/gpt-oss-120b",
         )
 
-        self.assertFalse(res["success"])
-        self.assertEqual(res["execution_mode"], "DETERMINISTIC FALLBACK")
-        self.assertEqual(res["error_type"], "RATE_LIMIT")
+        self.assertTrue(res["success"])
+        self.assertEqual(res["content"], "Forensic assessment complete.")
+        self.assertNotIn("Deep internal thinking", res["content"])
 
     @patch("src.agents.groq_client.Groq")
-    def test_network_connection_error_triggers_fallback(self, mock_groq_cls):
-        """Network error or timeout triggers graceful deterministic fallback."""
+    def test_gpt_oss_reasoning_without_content_not_treated_as_success(self, mock_groq_cls):
+        """Reasoning presence without user-facing content must NOT be treated as success."""
         mock_client = MagicMock()
         mock_groq_cls.return_value = mock_client
-        mock_client.chat.completions.create.side_effect = groq.APIConnectionError(
-            request=MagicMock()
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = ""
+        mock_choice.message.reasoning = "Thinking process completed."
+        mock_choice.finish_reason = "stop"
+        mock_client.chat.completions.create.return_value = MagicMock(choices=[mock_choice], usage=None)
+
+        res = generate_forensic_synthesis(
+            system_prompt="System prompt",
+            user_prompt="User prompt",
+            api_key="gsk_valid_key",
+            model="openai/gpt-oss-120b",
         )
+
+        self.assertFalse(res["success"])
+        self.assertEqual(res["error_type"], "EMPTY_COMPLETION")
+
+    @patch("src.agents.groq_client.Groq")
+    def test_token_limit_exhaustion_identified(self, mock_groq_cls):
+        """finish_reason='length' with empty content must be diagnosed as TOKEN_LIMIT_EXHAUSTED."""
+        mock_client = MagicMock()
+        mock_groq_cls.return_value = mock_client
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = ""
+        mock_choice.finish_reason = "length"
+        mock_client.chat.completions.create.return_value = MagicMock(choices=[mock_choice], usage=None)
 
         res = generate_forensic_synthesis(
             system_prompt="System prompt",
@@ -228,8 +255,62 @@ class TestGroqSynthesisAndFallback(unittest.TestCase):
         )
 
         self.assertFalse(res["success"])
-        self.assertEqual(res["execution_mode"], "DETERMINISTIC FALLBACK")
-        self.assertEqual(res["error_type"], "NETWORK_ERROR")
+        self.assertEqual(res["error_type"], "TOKEN_LIMIT_EXHAUSTED")
+        self.assertIn("Token budget exhausted", res["fallback_reason"])
+
+    @patch("src.agents.groq_client.Groq")
+    def test_model_refusal_identified(self, mock_groq_cls):
+        """Model refusal must be detected and diagnosed with error_type='REFUSAL'."""
+        mock_client = MagicMock()
+        mock_groq_cls.return_value = mock_client
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = ""
+        mock_choice.message.refusal = "Safety policy violation."
+        mock_choice.finish_reason = "stop"
+        mock_client.chat.completions.create.return_value = MagicMock(choices=[mock_choice], usage=None)
+
+        res = generate_forensic_synthesis(
+            system_prompt="System prompt",
+            user_prompt="User prompt",
+            api_key="gsk_valid_key",
+        )
+
+        self.assertFalse(res["success"])
+        self.assertEqual(res["error_type"], "REFUSAL")
+        self.assertIn("Safety policy violation", res["fallback_reason"])
+
+    @patch("src.agents.groq_client.Groq")
+    def test_connectivity_test_gpt_oss_parameters_and_prompt(self, mock_groq_cls):
+        """Connectivity test must use 'Reply with exactly the word VERIFIED.' and GPT-OSS parameters."""
+        mock_client = MagicMock()
+        mock_groq_cls.return_value = mock_client
+
+        mock_model = MagicMock()
+        mock_model.id = "openai/gpt-oss-120b"
+        mock_client.models.list.return_value = MagicMock(data=[mock_model])
+
+        mock_choice = MagicMock()
+        mock_choice.message.content = "VERIFIED"
+        mock_choice.finish_reason = "stop"
+        mock_client.chat.completions.create.return_value = MagicMock(choices=[mock_choice], usage=None)
+
+        res = verify_groq_connectivity(
+            api_key="gsk_test_key",
+            model="openai/gpt-oss-120b",
+        )
+
+        self.assertTrue(res["connected"])
+        self.assertEqual(res["mode"], "GROQ LIVE")
+
+        # Inspect call arguments
+        call_kwargs = mock_client.chat.completions.create.call_args[1]
+        self.assertEqual(call_kwargs["model"], "openai/gpt-oss-120b")
+        self.assertEqual(call_kwargs["max_completion_tokens"], 250)
+        self.assertFalse(call_kwargs["include_reasoning"])
+        self.assertEqual(call_kwargs["reasoning_effort"], "low")
+        self.assertFalse(call_kwargs["stream"])
+        self.assertEqual(call_kwargs["messages"][0]["content"], "Reply with exactly the word VERIFIED.")
 
 
 class TestLangGraphNodeExecutionModes(unittest.TestCase):

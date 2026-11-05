@@ -75,7 +75,9 @@ def get_groq_model() -> str:
 GROQ_API_KEY = get_groq_api_key()
 GROQ_MODEL = get_groq_model()
 GROQ_TEMPERATURE = float(os.getenv("GROQ_TEMPERATURE", "0.1"))
-GROQ_MAX_TOKENS = int(os.getenv("GROQ_MAX_TOKENS", "1500"))
+GROQ_MAX_TOKENS = int(os.getenv("GROQ_MAX_TOKENS", "2000"))
+GROQ_CONNECTIVITY_TOKEN_BUDGET = int(os.getenv("GROQ_CONNECTIVITY_TOKEN_BUDGET", "250"))
+GROQ_REASONING_EFFORT = os.getenv("GROQ_REASONING_EFFORT", "low")
 GROQ_TIMEOUT_SECONDS = float(os.getenv("GROQ_TIMEOUT_SECONDS", "30.0"))
 
 # Detection Risk Thresholds
