@@ -22,11 +22,11 @@ from src.ui.components import (
 )
 
 SAMPLE_TARGETS = {
-    "🔴 ILLICIT AGGREGATION #1": 230425980,
-    "🔴 ILLICIT PEELING CHAIN #2": 232438397,
-    "🟢 VERIFIED LICIT PAYMENT #1": 232532458,
-    "🟢 VERIFIED LICIT PAYMENT #2": 232819818,
-    "⚪ AMBIGUOUS UNKNOWN STREAM": 232344069,
+    "🔴 ILLICIT AGGREGATION #1": 232629023,
+    "🔴 ILLICIT PEELING CHAIN #2": 96564456,
+    "🟢 VERIFIED LICIT PAYMENT #1": 232438397,
+    "🟢 VERIFIED LICIT PAYMENT #2": 232029206,
+    "⚪ AMBIGUOUS UNKNOWN STREAM": 230425980,
 }
 
 
@@ -43,20 +43,23 @@ def render_transaction_search_page():
         unsafe_allow_html=True,
     )
 
+    # Initialize active target if not in state
+    if "active_tx_id" not in st.session_state:
+        st.session_state["active_tx_id"] = 232629023
+
     # Quick Target Presets
     st.markdown(
         "<span style='font-family:\"JetBrains Mono\",monospace; font-size:0.75rem; color:#00F5FF; font-weight:700;'>QUICK TARGET PRESETS:</span>",
         unsafe_allow_html=True,
     )
     cols = st.columns(len(SAMPLE_TARGETS))
-    preset_tx = None
     for idx, (label, tx_val) in enumerate(SAMPLE_TARGETS.items()):
-        if cols[idx].button(label, use_container_width=True):
-            preset_tx = tx_val
+        if cols[idx].button(label, key=f"target_preset_btn_{idx}", use_container_width=True):
+            st.session_state["active_tx_id"] = tx_val
+            st.session_state["tx_search_input_val"] = str(tx_val)
+            st.rerun()
 
     # Search Bar
-    default_tx = preset_tx if preset_tx else st.session_state.get("active_tx_id", 230425980)
-
     st.markdown(
         """
         <div style="font-family:'JetBrains Mono',monospace; font-size:0.8rem; color:#00FF9C; margin-top:10px; margin-bottom:-10px;">
@@ -66,18 +69,32 @@ def render_transaction_search_page():
         unsafe_allow_html=True,
     )
 
+    # Sync text input widget key with active_tx_id
+    if "tx_search_input_val" not in st.session_state:
+        st.session_state["tx_search_input_val"] = str(st.session_state["active_tx_id"])
+    elif st.session_state["tx_search_input_val"].isdigit() and int(st.session_state["tx_search_input_val"]) != st.session_state["active_tx_id"]:
+        # Reconcile if active_tx_id changed externally (e.g. from sidebar preset)
+        st.session_state["tx_search_input_val"] = str(st.session_state["active_tx_id"])
+
+    def on_tx_search_change():
+        val = st.session_state.get("tx_search_input_val", "").strip()
+        if val.isdigit():
+            st.session_state["active_tx_id"] = int(val)
+
     tx_input = st.text_input(
         "Enter Transaction ID:",
-        value=str(default_tx),
+        key="tx_search_input_val",
         label_visibility="collapsed",
         placeholder="ENTER TRANSACTION HASH / ID...",
+        on_change=on_tx_search_change,
     )
 
-    if not tx_input.strip().isdigit():
+    clean_input = tx_input.strip()
+    if not clean_input.isdigit():
         st.warning("PLEASE SPECIFY A VALID NUMERIC BITCOIN TRANSACTION IDENTIFIER.")
         return
 
-    tx_id = int(tx_input.strip())
+    tx_id = int(clean_input)
     st.session_state["active_tx_id"] = tx_id
 
     # Retrieve Profile

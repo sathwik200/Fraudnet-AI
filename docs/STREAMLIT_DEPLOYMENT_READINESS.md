@@ -15,7 +15,7 @@ This audit evaluates the readiness of FRAUDNET AI for public or private hosting 
 | Audit Area | Status | Findings / Remediation |
 | :--- | :---: | :--- |
 | **Streamlit Entry Point** | ✅ **READY** | `app.py` in project root; launch command: `streamlit run app.py` |
-| **Test Suite Health** | ✅ **READY** | **109 / 109 automated tests passing (100% pass rate in ~8.2s)** |
+| **Test Suite Health** | ✅ **READY** | **124 / 124 automated tests passing (100% pass rate in ~9.4s)** |
 | **Path Portability** | ✅ **READY** | Zero absolute paths in code; all paths derived via `Path(__file__)` |
 | **External File Dependencies**| ✅ **READY** | Zero dependencies outside project root; fully self-contained |
 | **Dependencies (`requirements.txt`)**| ✅ **READY** | Clean production dependencies file created with compatible versions |
@@ -338,6 +338,55 @@ Streamlit Community Cloud builds packages from `requirements.txt` using the late
    - **Heatmaps (Model Intelligence):** 2x2 confusion matrix with custom cyber colorscales.
 3. **Automated Regression Suite:**
    Added `tests/test_ui_theme_charts.py` containing 7 dedicated unit and integration tests.
-4. **Final Test Suite Health:**
+4. **Intermediate Test Suite Health:**
    **116 passed in 9.09s (100% pass rate).**
+
+---
+
+## 13. Production Hotfix: Transaction Forensics Preset Buttons & State Sync
+
+### 13.1 Defect Description
+On the **Transaction Forensic Analysis Terminal** (`src/ui/transaction_search.py`), clicking any of the five **Quick Target Preset** buttons (`🔴 ILLICIT AGGREGATION #1`, `🔴 ILLICIT PEELING CHAIN #2`, etc.) appeared completely non-responsive:
+- The active transaction ID remained locked at `230425980`.
+- Ground truth remained `UNKNOWN`.
+- The profile, graph metrics, ML prediction, and feature attribution did not update.
+
+### 13.2 Root Cause Analysis
+Two compounded root causes produced this failure:
+
+1. **Streamlit Text Input Widget State Retention:**
+   In Streamlit, when an `st.text_input` widget is rendered without a persistent key, Streamlit prioritizes its internal cached session state over the `value=str(default_tx)` parameter. On button click, the script re-evaluated, but `st.text_input` returned the previous run's text value (`"230425980"`). The code then overwrote `st.session_state["active_tx_id"]` with that stale value, effectively discarding the button click. Furthermore, button clicks did not invoke `st.rerun()`.
+
+2. **Semantic Misalignment of Hardcoded Preset IDs in Sample Dict:**
+   Inspection of `data/processed/transactions.parquet` revealed that the hardcoded preset IDs did not match their labeled classes:
+   - `230425980`: Mapped to "ILLICIT AGGREGATION #1", but actually labeled `"unknown"` in the dataset!
+   - `232438397`: Mapped to "ILLICIT PEELING CHAIN #2", but actually labeled `"2"` (licit) in the dataset!
+   - `232532458`: Mapped to "LICIT #1", but not present in the dataset at all!
+   - `232819818`: Mapped to "LICIT #2", but not present in the dataset at all!
+   - `232344069`: Mapped to "UNKNOWN", but actually labeled `"2"` (licit) in the dataset!
+
+### 13.3 Applied Solution
+1. **Verified Dataset Ground-Truth Mapping (`SAMPLE_TARGETS`):**
+   Queried the Elliptic transaction registry to select authentic, high-signal transaction identifiers:
+   - `🔴 ILLICIT AGGREGATION #1`: `232629023` -> Ground truth: `1` (Illicit), ML Probability: `0.9906` (Critical)
+   - `🔴 ILLICIT PEELING CHAIN #2`: `96564456` -> Ground truth: `1` (Illicit), ML Probability: `0.9818` (Critical, in=4, out=1)
+   - `🟢 VERIFIED LICIT PAYMENT #1`: `232438397` -> Ground truth: `2` (Licit), ML Probability: `0.0000` (Low, in=160, out=1)
+   - `🟢 VERIFIED LICIT PAYMENT #2`: `232029206` -> Ground truth: `2` (Licit), ML Probability: `0.0000` (Low, in=59, out=1)
+   - `⚪ AMBIGUOUS UNKNOWN STREAM`: `230425980` -> Ground truth: `unknown` (Stream node), ML Probability: `0.0324` (Low)
+
+2. **Session-State Synchronization & Widget Keys (`src/ui/transaction_search.py`):**
+   - Bound the text input to a persistent session state key: `key="tx_search_input_val"`.
+   - Each preset button assigns a unique key (`key=f"target_preset_btn_{idx}"`), updates `st.session_state["active_tx_id"]` and `st.session_state["tx_search_input_val"]`, and calls `st.rerun()`.
+   - Attached `on_change=on_tx_search_change` callback for manual keyboard entry and pressing Enter.
+
+3. **Global Cross-Page Synchronization (`app.py`, `src/ui/network_visualization.py`, `src/ui/report_viewer.py`):**
+   - Updated sidebar preset buttons in `app.py` with identical verified IDs and keys.
+   - Synchronized `Network Topology` and `Report Vault` pages with `st.session_state["active_tx_id"]` so navigating across tabs retains the investigated target seamlessly.
+
+4. **Automated Verification Suite (`tests/test_transaction_search_presets.py`):**
+   - Added 8 automated tests covering ground-truth validation, full profile retrieval, ML probabilities, graph neighborhoods, PDF report generation, and an end-to-end `streamlit.testing.v1.AppTest` interaction test.
+
+5. **Final Comprehensive Test Suite Health:**
+   **124 passed in 9.40s (100% pass rate).**
+
 

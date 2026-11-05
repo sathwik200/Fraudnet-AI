@@ -52,8 +52,22 @@ def render_report_viewer_page():
 
         c_tx, c_cert = st.columns([1.5, 1])
         with c_tx:
-            default_tx = st.session_state.get("active_tx_id", 230425980)
-            tx_input = st.text_input("Target Transaction Identifier (txId):", value=str(default_tx))
+            default_tx = st.session_state.get("active_tx_id", 232629023)
+            if "report_tx_input_val" not in st.session_state or st.session_state.get("report_last_active") != default_tx:
+                st.session_state["report_tx_input_val"] = str(default_tx)
+                st.session_state["report_last_active"] = default_tx
+
+            def on_report_input_change():
+                val = st.session_state.get("report_tx_input_val", "").strip()
+                if val.isdigit():
+                    st.session_state["active_tx_id"] = int(val)
+                    st.session_state["report_last_active"] = int(val)
+
+            tx_input = st.text_input(
+                "Target Transaction Identifier (txId):",
+                key="report_tx_input_val",
+                on_change=on_report_input_change,
+            )
         with c_cert:
             author_input = st.text_input("Certifying Officer Signature:", value="Sathwik M (Senior AML Auditor)")
 

@@ -93,15 +93,23 @@ def main():
         )
 
         col_b1, col_b2 = st.columns(2)
-        if col_b1.button("🔴 ILLICIT #1", use_container_width=True):
-            st.session_state["active_tx_id"] = 230425980
-        if col_b2.button("🟢 LICIT #1", use_container_width=True):
-            st.session_state["active_tx_id"] = 232532458
-
-        if col_b1.button("🔴 PEELING", use_container_width=True):
+        if col_b1.button("🔴 ILLICIT #1", key="sb_preset_illicit_1", use_container_width=True):
+            st.session_state["active_tx_id"] = 232629023
+            st.session_state["tx_search_input_val"] = "232629023"
+            st.rerun()
+        if col_b2.button("🟢 LICIT #1", key="sb_preset_licit_1", use_container_width=True):
             st.session_state["active_tx_id"] = 232438397
-        if col_b2.button("⚪ UNKNOWN", use_container_width=True):
-            st.session_state["active_tx_id"] = 232819818
+            st.session_state["tx_search_input_val"] = "232438397"
+            st.rerun()
+
+        if col_b1.button("🔴 PEELING", key="sb_preset_peeling", use_container_width=True):
+            st.session_state["active_tx_id"] = 96564456
+            st.session_state["tx_search_input_val"] = "96564456"
+            st.rerun()
+        if col_b2.button("⚪ UNKNOWN", key="sb_preset_unknown", use_container_width=True):
+            st.session_state["active_tx_id"] = 230425980
+            st.session_state["tx_search_input_val"] = "230425980"
+            st.rerun()
 
         st.markdown(
             """

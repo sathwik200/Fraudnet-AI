@@ -34,11 +34,22 @@ def render_network_visualization_page():
     # Tactical Controls Bar
     c_tx, c_hop, c_limit = st.columns([2, 1, 1])
     with c_tx:
-        default_tx = st.session_state.get("active_tx_id", 230425980)
+        default_tx = st.session_state.get("active_tx_id", 232629023)
+        if "network_tx_input_val" not in st.session_state or st.session_state.get("network_last_active") != default_tx:
+            st.session_state["network_tx_input_val"] = str(default_tx)
+            st.session_state["network_last_active"] = default_tx
+
+        def on_network_input_change():
+            val = st.session_state.get("network_tx_input_val", "").strip()
+            if val.isdigit():
+                st.session_state["active_tx_id"] = int(val)
+                st.session_state["network_last_active"] = int(val)
+
         tx_input = st.text_input(
             "FOCAL TRANSACTION IDENTIFIER:",
-            value=str(default_tx),
+            key="network_tx_input_val",
             placeholder="ENTER TXID...",
+            on_change=on_network_input_change,
         )
     with c_hop:
         hops = st.selectbox("EGO HORIZON (HOPS):", options=[1, 2], index=0)
