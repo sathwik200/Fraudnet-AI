@@ -58,6 +58,6 @@ flowchart LR
    - Evaluates the transaction through the Champion Random Forest model bundle.
    - Extracts illicit probability, risk category, and local z-score feature attribution drivers.
 5. **`synthesize_forensics` Node:**
-   - **Mode A (Groq Online):** Calls `ChatGroq(model_name="llama-3.3-70b-versatile")` with the `SYSTEM_INVESTIGATION_PROMPT` and structured evidence dossier.
+   - **Mode A (Groq Online):** Invokes Groq Chat Completions API (`openai/gpt-oss-120b`) with the `SYSTEM_INVESTIGATION_PROMPT` and structured evidence dossier.
    - **Mode B (Deterministic Fallback):** Assembles a structured Markdown investigation report categorizing AML typologies (aggregation, distribution, pass-through relay), local feature drivers, and regulatory recommendations.
 

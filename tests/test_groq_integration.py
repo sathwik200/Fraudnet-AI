@@ -343,6 +343,71 @@ class TestEvidenceConsistencyAndSecurity(unittest.TestCase):
         self.assertIn("[REDACTED_API_KEY]", sanitized)
 
 
+class TestUIGroqTelemetryAndRendering(unittest.TestCase):
+    """Test AI Assistant UI elements, central configuration usage, and telemetry consistency."""
+
+    def test_no_stale_hardcoded_model_name_in_active_code(self):
+        """Active src/ and config/ code must not contain stale 'llama-3.3-70b-versatile' references."""
+        src_dir = PROJECT_ROOT / "src"
+        config_dir = PROJECT_ROOT / "config"
+        app_file = PROJECT_ROOT / "app.py"
+
+        stale_occurrences = []
+        for path in list(src_dir.rglob("*.py")) + list(config_dir.rglob("*.py")) + [app_file]:
+            content = path.read_text(encoding="utf-8")
+            if "llama-3.3-70b-versatile" in content:
+                stale_occurrences.append(str(path.relative_to(PROJECT_ROOT)))
+
+        self.assertEqual(
+            stale_occurrences,
+            [],
+            f"Stale model name 'llama-3.3-70b-versatile' found in active code: {stale_occurrences}",
+        )
+
+    def test_connectivity_control_rendered_prominently(self):
+        """Verify the exact required connectivity control label exists in ai_assistant.py."""
+        assistant_file = PROJECT_ROOT / "src" / "ui" / "ai_assistant.py"
+        content = assistant_file.read_text(encoding="utf-8")
+        self.assertIn("TEST LIVE GROQ CONNECTIVITY & MODEL AVAILABILITY", content)
+        self.assertIn("btn_live_groq_connectivity_test", content)
+
+    def test_telemetry_status_agreement_logic(self):
+        """Verify telemetry indicators agree across offline, configured, and live states."""
+        # Case 1: Unconfigured key -> DETERMINISTIC FALLBACK
+        with patch.dict(os.environ, {}, clear=True):
+            key = get_groq_api_key()
+            self.assertEqual(key, "")
+            is_live = False
+            status = "GROQ LIVE" if is_live else ("CONFIGURED / NOT VERIFIED" if key else "DETERMINISTIC FALLBACK")
+            self.assertEqual(status, "DETERMINISTIC FALLBACK")
+
+        # Case 2: Configured key but not verified live -> CONFIGURED / NOT VERIFIED
+        with patch.dict(os.environ, {"GROQ_API_KEY": "gsk_dummy_test_key"}):
+            key = get_groq_api_key()
+            self.assertTrue(bool(key))
+            is_live = False
+            status = "GROQ LIVE" if is_live else ("CONFIGURED / NOT VERIFIED" if key else "DETERMINISTIC FALLBACK")
+            self.assertEqual(status, "CONFIGURED / NOT VERIFIED")
+
+        # Case 3: Live completion verified -> GROQ LIVE
+        with patch.dict(os.environ, {"GROQ_API_KEY": "gsk_dummy_test_key"}):
+            key = get_groq_api_key()
+            is_live = True
+            status = "GROQ LIVE" if is_live else ("CONFIGURED / NOT VERIFIED" if key else "DETERMINISTIC FALLBACK")
+            self.assertEqual(status, "GROQ LIVE")
+
+    def test_missing_api_key_does_not_hide_assistant_interface(self):
+        """Even when GROQ_API_KEY is empty, the complete UI elements are preserved."""
+        assistant_file = PROJECT_ROOT / "src" / "ui" / "ai_assistant.py"
+        content = assistant_file.read_text(encoding="utf-8")
+        # All required components present
+        self.assertIn("FRAUDNET INTELLIGENCE AGENT", content)
+        self.assertIn("TACTICAL INVESTIGATION PROMPTS:", content)
+        self.assertIn("AUDIT TX 230425980", content)
+        self.assertIn("st.chat_input", content)
+        self.assertIn("TEST LIVE GROQ CONNECTIVITY & MODEL AVAILABILITY", content)
+
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -69,8 +69,13 @@ def main():
 
         active_key = get_groq_api_key()
         active_model = get_groq_model()
-        has_groq = bool(active_key)
-        llm_label = f"<span class='active'>READY [{active_model[:12]}]</span>" if has_groq else "<span style='color:#FFB547;'>OFFLINE (DETERMINISTIC)</span>"
+        is_live = st.session_state.get("groq_verified_live", False) if hasattr(st, "session_state") else False
+        if is_live:
+            llm_label = f"<span class='active'>GROQ LIVE [{active_model[:12]}]</span>"
+        elif active_key:
+            llm_label = "<span style='color:#00F5FF;'>CONFIGURED / NOT VERIFIED</span>"
+        else:
+            llm_label = "<span style='color:#FFB547;'>DETERMINISTIC FALLBACK</span>"
 
         st.markdown(
             f"""

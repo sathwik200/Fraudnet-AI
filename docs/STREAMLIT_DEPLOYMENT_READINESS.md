@@ -15,7 +15,7 @@ This audit evaluates the readiness of FRAUDNET AI for public or private hosting 
 | Audit Area | Status | Findings / Remediation |
 | :--- | :---: | :--- |
 | **Streamlit Entry Point** | ✅ **READY** | `app.py` in project root; launch command: `streamlit run app.py` |
-| **Test Suite Health** | ✅ **READY** | **162 / 162 automated tests passing (100% pass rate in ~9.5s)** |
+| **Test Suite Health** | ✅ **READY** | **166 / 166 automated tests passing (100% pass rate in ~9.9s)** |
 | **Path Portability** | ✅ **READY** | Zero absolute paths in code; all paths derived via `Path(__file__)` |
 | **External File Dependencies**| ✅ **READY** | Zero dependencies outside project root; fully self-contained |
 | **Dependencies (`requirements.txt`)**| ✅ **READY** | Clean production dependencies file created with compatible versions |

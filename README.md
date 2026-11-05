@@ -16,7 +16,7 @@ The system integrates:
 1. **Topological Graph Analytics:** In/out-degree centrality, directed PageRank ($\alpha=0.85$), Louvain community detection ($Q=0.812$), and 99th percentile aggregation/distribution hub detection.
 2. **Supervised ML Fraud Detection:** Three-model comparative benchmark with strict chronological forward validation (Train 1–28, Val 29–34, Test 35–49). Champion Random Forest achieves **0.7018 Illicit F1**, **0.7874 PR-AUC**, and **0.9384 ROC-AUC** on unseen future transactions.
 3. **Explainable AI (XAI):** Local Z-score feature attributions highlighting risk-elevating and risk-mitigating forensic anomalies.
-4. **LangGraph Autonomous Investigation Agent:** Multi-step forensic reasoning graph with Groq Cloud LLM (`llama-3.3-70b-versatile`) and algorithmic deterministic fallback.
+4. **LangGraph Autonomous Investigation Agent:** Multi-step forensic reasoning graph with Groq Cloud LLM (`openai/gpt-oss-120b`) and algorithmic deterministic fallback.
 5. **SQLite Case Management:** Complete audit trail tracking cases, attached suspect transactions, investigator notes, and report history.
 6. **Pure-Python Forensic PDF Dossier Generator:** Standards-compliant PDF 1.4 binary documents rendered with zero external dependencies.
 7. **Streamlit Multi-Page Investigation Portal:** 7 full-featured forensic intelligence pages with dark cybersecurity theme.

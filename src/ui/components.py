@@ -18,9 +18,17 @@ def render_command_header(module_title: str):
     now_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     active_key = get_groq_api_key()
     active_model = get_groq_model()
-    has_groq = bool(active_key)
-    groq_label = f"GROQ//READY [{active_model}]" if has_groq else "DETERMINISTIC//AML-RULES"
-    groq_pill_class = "pill-cyan" if has_groq else "pill-amber"
+    is_live = st.session_state.get("groq_verified_live", False) if hasattr(st, "session_state") else False
+
+    if is_live:
+        groq_label = f"GROQ LIVE [{active_model}]"
+        groq_pill_class = "pill-operational"
+    elif active_key:
+        groq_label = f"CONFIGURED / NOT VERIFIED [{active_model}]"
+        groq_pill_class = "pill-cyan"
+    else:
+        groq_label = "DETERMINISTIC FALLBACK"
+        groq_pill_class = "pill-amber"
 
     header_html = f"""
     <div class="cyber-top-header">

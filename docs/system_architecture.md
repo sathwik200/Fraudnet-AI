@@ -92,7 +92,7 @@ flowchart TD
 ### 3.5 AI Investigation Agent & Tool Services
 - **Location:** `src/agents/`, `src/tools/`
 - **Agent Architecture:** Compiled LangGraph `StateGraph` running through `extract_entities` $\rightarrow$ `fetch_profile` $\rightarrow$ `fetch_network_context` $\rightarrow$ `fetch_prediction` $\rightarrow$ `synthesize_forensics`.
-- **Groq Integration:** Interfaced with `ChatGroq` (`llama-3.3-70b-versatile`). When `GROQ_API_KEY` is not present or API connectivity fails, transitions seamlessly to deterministic algorithmic AML synthesis without interruption.
+- **Groq Integration:** Interfaced with Groq Cloud SDK (`openai/gpt-oss-120b`). When `GROQ_API_KEY` is not present or API connectivity fails, transitions seamlessly to deterministic algorithmic AML synthesis without interruption.
 
 ### 3.6 Persistence & Forensic Reporting
 - **Location:** `src/database/`, `src/reports/`
