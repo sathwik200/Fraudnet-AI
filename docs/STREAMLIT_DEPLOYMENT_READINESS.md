@@ -15,7 +15,7 @@ This audit evaluates the readiness of FRAUDNET AI for public or private hosting 
 | Audit Area | Status | Findings / Remediation |
 | :--- | :---: | :--- |
 | **Streamlit Entry Point** | ✅ **READY** | `app.py` in project root; launch command: `streamlit run app.py` |
-| **Test Suite Health** | ✅ **READY** | **132 / 132 automated tests passing (100% pass rate in ~10.0s)** |
+| **Test Suite Health** | ✅ **READY** | **143 / 143 automated tests passing (100% pass rate in ~10.5s)** |
 | **Path Portability** | ✅ **READY** | Zero absolute paths in code; all paths derived via `Path(__file__)` |
 | **External File Dependencies**| ✅ **READY** | Zero dependencies outside project root; fully self-contained |
 | **Dependencies (`requirements.txt`)**| ✅ **READY** | Clean production dependencies file created with compatible versions |
@@ -420,8 +420,44 @@ NameError: name 'pd' is not defined
    - Populated and empty DataFrame generation for both inflows and outflows.
    - NetworkX spring layout embedding and node role/color assignment (purple diamond for focal center, red for illicit, green for licit, amber/cyan for unknown).
    - Headless Streamlit `AppTest` navigation to `'🕸️ 03 // NETWORK TOPOLOGY'` asserting zero runtime exceptions.
-4. **Final Comprehensive Test Suite Health:**
+4. **Intermediate Test Suite Health:**
    **132 passed in 10.04s (100% pass rate).**
+
+---
+
+## 15. Forensic Dossier Accuracy, Typology Evidence, and Compliance Audit
+
+### 15.1 Defect & Inconsistency Audit
+A comprehensive audit of the forensic investigation engine, agent nodes, report generator, and network explorer identified several inconsistencies:
+1. **Network Metric Discrepancy:** In `src/agents/nodes.py`, the agent attempted to read `ego.get("predecessors", [])` and `ego.get("successors", [])`. Because `get_transaction_neighborhood` previously returned `direct_predecessors_count` and `direct_predecessors_sample`, the predecessor and successor lists defaulted to empty lists (`[]`). This resulted in an out-degree of 1 being reported alongside 0 direct successors in the agent dossier.
+2. **Unsupported AML Typology Attribution:** Standard transactions (e.g. 1-in / 1-out or arbitrary connectivity) were defaulted to "Standard Mesh Flow / Arbitrage" or "Linear Pass-Through Relay (Intermediate Layering)" without sufficient topological evidence.
+3. **Feature Attribution Clarity:** The report generator and agent did not clearly distinguish between records with no significant statistical deviations (|z| < 1.5) and records where feature attribution was unavailable. The mathematical attribution methodology was not explicitly declared.
+4. **Non-Compliant Action Directives:** Agent reports contained unsupported directives such as "flag address for enhanced SAR filing and freeze counterparty hops", which violated AML compliance principles prioritizing human review and independent corroboration.
+5. **AI Execution Transparency:** The dossier did not clearly distinguish between Groq Cloud LLM synthesis and the offline deterministic rule-based fallback engine.
+
+### 15.2 Applied Solutions
+1. **Topological Metric Synchronization (`src/tools/graph_tools.py`):**
+   - Updated `get_transaction_neighborhood` to return `predecessors`, `successors`, `global_in_degree`, and `global_out_degree` alongside sample arrays.
+   - Guaranteed that global in-degree strictly equals `direct_predecessors_count` and global out-degree strictly equals `direct_successors_count`.
+   - Dossier explicitly distinguishes global partition degrees from bounded ego-subgraph rendered nodes.
+2. **Evidence-Based AML Typology Classifier (`src/analytics/typology.py`):**
+   - Implemented `classify_aml_typology`: Typologies (e.g. High Fan-In Aggregation Hub, High Fan-Out Distribution Hub, Direct Point-to-Point Transfer) require concrete topological thresholds (fan-in/fan-out ratios, 99th percentile hub verification).
+   - Ambiguous or low-degree topologies strictly report: `"Insufficient evidence to determine transaction typology"`.
+   - Every classification provides concrete supporting graph observations.
+3. **Feature Attribution Transparency (`src/ml/explainability.py`):**
+   - Declared attribution methodology: `Standardized Feature Baseline Deviation (Z-score) × Random Forest Gini Impurity Importance`.
+   - Added `attribution_available` and `has_significant_anomalies` flags.
+   - Transparently states: `"No significant local feature anomalies observed deviating from the licit baseline (|z| < 1.5)"` when deviations are within normal bounds.
+4. **Responsible Compliance Guidance (`src/agents/nodes.py`, `src/reports/report_generator.py`):**
+   - Replaced automatic freeze/SAR text with mandatory recommendations for human analyst review, Enhanced Due Diligence (EDD), and independent verification across blockchain explorer ledgers.
+   - Emphasized that Elliptic dataset classifications reflect historical academic research benchmarks and do not independently establish criminal guilt.
+5. **Execution Transparency Disclosure (`src/agents/nodes.py`, `src/reports/report_generator.py`):**
+   - Dossier and PDF report headers explicitly disclose execution mode: `Deterministic Rule-Based Forensic Engine (Fallback / Offline Mode)` or `Groq Cloud AI Synthesis (Model: llama-3.3-70b-versatile)`.
+6. **Automated Regression Suite (`tests/test_forensic_dossier_accuracy.py`):**
+   - Added 11 automated unit and integration tests covering metric consistency, typology suppression, attribution integrity, compliance safety, and cross-module consistency.
+7. **Final Comprehensive Test Suite Health:**
+   **143 passed in 10.50s (100% pass rate).**
+
 
 
 

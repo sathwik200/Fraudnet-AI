@@ -102,41 +102,63 @@ def explain_transaction_prediction(
     top_licit_indices = np.argsort(local_impact)[:top_n]
 
     drivers = []
+    top_elevating = []
+    top_mitigating = []
+
     for idx in top_illicit_indices:
         feat = feature_names[idx]
         z_score = float(X_vec[idx])
         impact = float(local_impact[idx])
-        drivers.append({
+        val = round(float(df_row[feat].iloc[0]), 4) if feat in df_row else 0.0
+        d_item = {
             "feature": feat,
+            "value": val,
             "z_score": round(z_score, 2),
             "impact_direction": "increases_risk",
             "impact_score": round(impact, 4),
+            "reason": f"{feat} is {abs(z_score):.1f} std devs {'above' if z_score > 0 else 'below'} normal, elevating estimated risk.",
             "explanation": f"{feat} is {abs(z_score):.1f} std devs {'above' if z_score > 0 else 'below'} normal, elevating estimated risk.",
-        })
+        }
+        drivers.append(d_item)
+        if impact > 0:
+            top_elevating.append(d_item)
 
     for idx in top_licit_indices:
         feat = feature_names[idx]
         z_score = float(X_vec[idx])
         impact = float(local_impact[idx])
-        drivers.append({
+        val = round(float(df_row[feat].iloc[0]), 4) if feat in df_row else 0.0
+        d_item = {
             "feature": feat,
+            "value": val,
             "z_score": round(z_score, 2),
             "impact_direction": "decreases_risk",
             "impact_score": round(impact, 4),
+            "reason": f"{feat} aligns closely with baseline licit behavior, reducing estimated risk.",
             "explanation": f"{feat} aligns closely with baseline licit behavior, reducing estimated risk.",
-        })
+        }
+        drivers.append(d_item)
+        if impact < 0:
+            top_mitigating.append(d_item)
 
+    has_sig = any(abs(d["z_score"]) >= 1.5 for d in drivers)
     narrative = (
-        f"Top {len(top_illicit_indices)} risk-elevating indicators and top {len(top_licit_indices)} "
-        "mitigating indicators derived from standardized feature deviations and model weights."
+        f"Feature attribution via standardized deviations (Z-score) and Gini feature importances. "
+        f"{'Observed significant statistical deviations.' if has_sig else 'No extreme statistical outliers detected against licit baseline (|z| < 1.5).'}"
     )
 
     return {
+        "attribution_available": True,
+        "methodology": "Standardized Feature Baseline Deviation (Z-score) × Random Forest Gini Impurity Importance",
+        "has_significant_anomalies": has_sig,
         "top_drivers": drivers,
+        "top_risk_elevating": top_elevating,
+        "top_risk_mitigating": top_mitigating,
         "narrative": narrative,
         "uncertainty_note": (
-            "Model predictions reflect statistical associations with labeled training examples. "
-            "They must be verified against blockchain explorers, transaction metadata, and human investigative review."
+            "Model predictions and feature attributions reflect statistical associations with labeled training examples. "
+            "They are forensic investigative leads, not legal proof of fraud or illicit activity. "
+            "All findings must be independently corroborated by compliance officers."
         ),
     }
 

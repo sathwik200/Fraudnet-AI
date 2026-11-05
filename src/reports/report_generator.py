@@ -234,7 +234,8 @@ def generate_forensic_pdf_report(
     pdf.add_rect(0, 720, 612, 72, 0.06, 0.09, 0.16)  # Dark navy #0f172a
     pdf.add_text("FRAUDNET AI | FORENSIC INVESTIGATION REPORT", 50, 760, size=15, bold=True, r=0.23, g=0.51, b=0.96)
     pdf.add_text("CRYPTOCURRENCY TRANSACTION NETWORK INTELLIGENCE", 50, 742, size=9, bold=False, r=0.6, g=0.7, b=0.9)
-    pdf.add_text(f"Report ID: {report_id}", 380, 742, size=8, bold=False, r=0.8, g=0.8, b=0.8)
+    exec_mode = dossier.get("execution_mode", "Deterministic Rule-Based Forensic Engine")
+    pdf.add_text(f"Report ID: {report_id}  |  Mode: {exec_mode}", 240, 742, size=7, bold=False, r=0.8, g=0.8, b=0.8)
 
     pdf.current_y = 690.0
 
@@ -285,11 +286,17 @@ def generate_forensic_pdf_report(
     pdf.current_y -= 20
 
     gm = dossier.get("graph_metrics", {})
+    typology_info = dossier.get("typology_assessment", {})
+    typology_title = typology_info.get("typology", "Unclassified")
+    bounded = dossier.get("bounded_subgraph_metrics", {})
+    subgraph_nodes = bounded.get("rendered_nodes", len(dossier.get("neighborhood", {}).get("nodes", [])))
+
     metrics_table = [
-        ("In-Degree (Incoming Inputs):", f"{gm.get('in_degree', 0):,}", "PageRank Centrality:", f"{gm.get('pagerank', 0.0):.6f}"),
-        ("Out-Degree (Outgoing Outputs):", f"{gm.get('out_degree', 0):,}", "Clustering Coefficient:", f"{gm.get('clustering_coeff', 0.0):.4f}"),
-        ("Total Degree:", f"{gm.get('total_degree', 0):,}", "Community ID:", f"{gm.get('community_id', 0)}"),
+        ("Global In-Degree (Partition):", f"{gm.get('in_degree', 0):,}", "PageRank Centrality:", f"{gm.get('pagerank', 0.0):.6f}"),
+        ("Global Out-Degree (Partition):", f"{gm.get('out_degree', 0):,}", "Clustering Coefficient:", f"{gm.get('clustering_coeff', 0.0):.4f}"),
+        ("Total Global Degree:", f"{gm.get('total_degree', 0):,}", "Community ID:", f"{gm.get('community_id', 0)}"),
         ("Weakly Connected Component:", f"WCC #{gm.get('wcc_id', 0)}", "Component Size:", f"{gm.get('wcc_size', 0):,} nodes"),
+        ("Topological Typology:", f"{typology_title[:28]}", "Bounded Subgraph Nodes:", f"{subgraph_nodes} rendered"),
     ]
 
     for c1_label, c1_val, c2_label, c2_val in metrics_table:
@@ -305,9 +312,13 @@ def generate_forensic_pdf_report(
     pdf.add_text("3. TOP PREDICTIVE FEATURE DRIVERS", 50, pdf.current_y, size=11, bold=True, r=0.1, g=0.15, b=0.3)
     pdf.current_y -= 8
     pdf.add_line(50, pdf.current_y, 562, pdf.current_y, width=1.0, r=0.2, g=0.4, b=0.8)
-    pdf.current_y -= 20
+    pdf.current_y -= 16
 
     expl = dossier.get("explainability", {})
+    methodology_text = expl.get("methodology", "Standardized Feature Deviation (Z-score) × Model Gini Importance")
+    pdf.add_text(f"Attribution Method: {methodology_text}", 60, pdf.current_y, size=8, bold=False, r=0.4, g=0.4, b=0.4)
+    pdf.current_y -= 16
+
     drivers = expl.get("top_drivers", [])[:6]
 
     if drivers:
@@ -321,8 +332,11 @@ def generate_forensic_pdf_report(
             pdf.current_y -= 12
             pdf.add_text(f"  {d.get('explanation')}", 75, pdf.current_y, size=8, r=0.3, g=0.3, b=0.3)
             pdf.current_y -= 15
+    elif not expl.get("attribution_available", True):
+        pdf.add_text("Feature attribution unavailable for this transaction record.", 60, pdf.current_y, size=9)
+        pdf.current_y -= 20
     else:
-        pdf.add_text("No significant feature outliers detected against licit baseline.", 60, pdf.current_y, size=9)
+        pdf.add_text("No significant feature outliers detected against licit baseline (|z| < 1.5).", 60, pdf.current_y, size=9)
         pdf.current_y -= 20
 
     pdf.current_y -= 10
@@ -345,6 +359,25 @@ def generate_forensic_pdf_report(
         "All investigative findings must be corroborated with blockchain ledger data and human expertise."
     )
     pdf.add_wrapped_text(disclaimer, size=8, line_height=11, bold=False, r=0.45, g=0.45, b=0.45)
+
+    pdf.current_y -= 10
+
+    # Section: Responsible Compliance Guidance
+    pdf.check_space(80)
+    pdf.add_text("5. RESPONSIBLE COMPLIANCE RECOMMENDATIONS", 50, pdf.current_y, size=11, bold=True, r=0.1, g=0.15, b=0.3)
+    pdf.current_y -= 8
+    pdf.add_line(50, pdf.current_y, 562, pdf.current_y, width=1.0, r=0.2, g=0.4, b=0.8)
+    pdf.current_y -= 16
+
+    recs = dossier.get("compliance_recommendations", [
+        "Human Review Required: Algorithmic risk scores serve as exploratory leads and must not trigger automated asset freezes or filings.",
+        "Enhanced Due Diligence (EDD): Independently verify counterparty entities across block explorer records and licensed VASPs.",
+        "Corroboration: Ground-truth classifications reflect historical academic research datasets (Elliptic) and do not independently establish criminal guilt.",
+    ])
+    for rec in recs:
+        pdf.check_space(16)
+        pdf.add_text(f"• {rec}", 60, pdf.current_y, size=8, r=0.2, g=0.2, b=0.2)
+        pdf.current_y -= 13
 
     # Footer
     pdf.add_line(50, 45, 562, 45, width=0.5, r=0.7, g=0.7, b=0.7)

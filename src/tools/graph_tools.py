@@ -99,6 +99,10 @@ def get_transaction_neighborhood(
     return {
         "center_node": tx_id,
         "hops": hops,
+        "global_in_degree": len(predecessors),
+        "global_out_degree": len(successors),
+        "predecessors": predecessors,
+        "successors": successors,
         "direct_predecessors_count": len(predecessors),
         "direct_successors_count": len(successors),
         "direct_predecessors_sample": predecessors[:10],
